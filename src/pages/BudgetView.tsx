@@ -9,6 +9,7 @@ import { formatMoney, toUsd } from '../lib/currency'
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../types'
 import { Modal } from '../components/Modal'
 import { ReceiptCapture } from '../components/ReceiptCapture'
+import { ScanReceiptsButton } from '../components/ScanReceiptsFlow'
 
 const COLORS = ['#81e0ae', '#072225', '#ffc800', '#2563eb', '#dc2626', '#0891b2', '#64748b']
 
@@ -80,13 +81,16 @@ export function BudgetView() {
         <div className="rounded-xl border border-stone-200 bg-white lg:col-span-2">
           <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3.5">
             <h3 className="text-sm font-semibold text-stone-900">Expense log</h3>
-            <button
-              onClick={() => setAdding(true)}
-              className="flex items-center gap-1 rounded-lg bg-brand-mint-dark px-3 py-1.5 text-xs font-medium text-white hover:brightness-95"
-            >
-              <Plus size={14} />
-              Log expense
-            </button>
+            <div className="flex gap-2">
+              <ScanReceiptsButton tripId={active.id} tripName={trip.name} />
+              <button
+                onClick={() => setAdding(true)}
+                className="flex items-center gap-1 rounded-lg bg-brand-mint-dark px-3 py-1.5 text-xs font-medium text-white hover:brightness-95"
+              >
+                <Plus size={14} />
+                Log expense
+              </button>
+            </div>
           </div>
           <div className="max-h-[420px] divide-y divide-stone-100 overflow-y-auto">
             {sorted.length === 0 && <div className="px-5 py-4 text-sm text-stone-400">No expenses yet.</div>}

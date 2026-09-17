@@ -3,6 +3,7 @@ import { Plus, Trash2, Search, RotateCcw, Cloud, CloudOff, Loader2 } from 'lucid
 import { useStore, useActiveTrip } from '../store'
 import { useDropboxStore } from '../dropboxStore'
 import { geocodeCity } from '../lib/geocode'
+import { getQueuedReceipts } from '../lib/receiptQueue'
 import { Modal } from '../components/Modal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 
@@ -144,10 +145,17 @@ function DropboxSection() {
   const connect = useDropboxStore((s) => s.connect)
   const disconnect = useDropboxStore((s) => s.disconnect)
   const completeAuthIfNeeded = useDropboxStore((s) => s.completeAuthIfNeeded)
+  const [pendingCount, setPendingCount] = useState<number | null>(null)
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('code')) completeAuthIfNeeded()
   }, [completeAuthIfNeeded])
+
+  useEffect(() => {
+    getQueuedReceipts().then((items) => setPendingCount(items.length))
+    const id = setInterval(() => getQueuedReceipts().then((items) => setPendingCount(items.length)), 4000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
     <section className="rounded-xl border border-stone-200 bg-white p-4 md:p-5">
@@ -159,6 +167,12 @@ function DropboxSection() {
         Connect Dropbox to upload receipt photos straight from the expense log. Uses your own Dropbox app, nothing goes through
         a third-party server.
       </p>
+
+      {!!pendingCount && (
+        <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          {pendingCount} receipt{pendingCount === 1 ? '' : 's'} saved offline, waiting to upload once you're back online.
+        </p>
+      )}
 
       {accessToken ? (
         <div className="flex items-center justify-between rounded-lg bg-brand-mint/10 px-3 py-2.5">
