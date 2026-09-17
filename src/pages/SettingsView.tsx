@@ -157,7 +157,7 @@ function DropboxFolderField() {
         />
       </label>
       <p className="mt-1 text-xs text-stone-400">
-        Leave blank to auto-use <span className="font-mono">{autoPath}</span>. Each trip can point at its own folder — set this
+        Leave blank to auto-use <span className="font-mono">{autoPath}</span>. Each trip can point at its own folder: set this
         per trip in its own Settings page.
       </p>
     </div>

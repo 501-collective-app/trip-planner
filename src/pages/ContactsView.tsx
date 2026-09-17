@@ -20,7 +20,7 @@ export function ContactsView() {
   return (
     <div className="mx-auto max-w-3xl px-3 py-4 md:px-6 md:py-6">
       <div className="mb-6 flex items-center justify-between">
-        <p className="text-sm text-stone-500">Organizers, hosts, drivers — anyone you need to reach on this trip.</p>
+        <p className="text-sm text-stone-500">Organizers, hosts, drivers: anyone you need to reach on this trip.</p>
         <button
           onClick={() => setAdding(true)}
           className="flex items-center gap-1 rounded-lg bg-brand-mint-dark px-3 py-1.5 text-xs font-medium text-white hover:brightness-95"

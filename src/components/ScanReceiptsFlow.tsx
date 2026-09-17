@@ -142,7 +142,7 @@ export function ScanReceiptsFlow({
             >
               {queued ? <CloudOff size={26} /> : <Check size={26} />}
             </div>
-            <p className="text-base font-medium text-white">{queued ? 'Saved — will upload once online' : 'Uploaded to Dropbox'}</p>
+            <p className="text-base font-medium text-white">{queued ? 'Saved, will upload once online' : 'Uploaded to Dropbox'}</p>
             {!accessToken && !queued && (
               <p className="mt-1 text-xs text-white/40">Connect Dropbox in Settings to actually upload receipts.</p>
             )}

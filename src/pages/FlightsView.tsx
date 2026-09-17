@@ -324,7 +324,7 @@ function LiveStatus({ flightNumber, date }: { flightNumber?: string; date: strin
           </div>
           <div>
             <div className="font-medium text-stone-700">
-              {status.departure.gate ? `Gate ${status.departure.gate}` : '—'}
+              {status.departure.gate ? `Gate ${status.departure.gate}` : 'Not assigned yet'}
               {status.departure.terminal ? ` (T${status.departure.terminal})` : ''}
             </div>
             <div className="text-stone-400">{status.departure.revisedTime ? fmtAmPmFromIso(status.departure.revisedTime) : 'Departure'}</div>

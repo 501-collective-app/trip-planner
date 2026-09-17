@@ -104,7 +104,7 @@ export function ReceiptCapture({
         </button>
       )}
       {status === 'error' && (
-        <p className="mt-1 text-xs text-red-600">Couldn't upload — check your Dropbox connection in Settings and try again.</p>
+        <p className="mt-1 text-xs text-red-600">Couldn't upload. Check your Dropbox connection in Settings and try again.</p>
       )}
     </div>
   )
