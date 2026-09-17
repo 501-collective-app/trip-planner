@@ -15,8 +15,8 @@ export const NAV: { id: Tab; label: string; icon: typeof CalendarDays }[] = [
 export function Sidebar({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   return (
     <aside className="hidden h-full w-60 shrink-0 flex-col bg-brand-dark md:flex">
-      <div className="border-b border-white/10 px-5 py-6">
-        <BrandMark />
+      <div className="flex justify-center overflow-hidden border-b border-white/10 py-6">
+        <BrandMark badge />
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
