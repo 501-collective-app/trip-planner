@@ -46,15 +46,17 @@ export function ClockRow() {
   if (!tripTime && !portlandTime) return null
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone-500">
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
       {tripTime && (
-        <span>
-          <span className="font-medium text-stone-700">{dest?.city ?? 'Trip'}</span> {tripTime}
+        <span className="flex items-baseline gap-2">
+          <span className="text-sm font-semibold uppercase tracking-wide text-stone-500">{dest?.city ?? 'Trip'}</span>
+          <span className="text-2xl font-bold text-stone-900 md:text-3xl">{tripTime}</span>
         </span>
       )}
       {portlandTime && (
-        <span>
-          <span className="font-medium text-stone-700">Portland, OR</span> {portlandTime}
+        <span className="flex items-baseline gap-2">
+          <span className="text-sm font-semibold uppercase tracking-wide text-stone-500">Portland, OR</span>
+          <span className="text-2xl font-bold text-stone-900 md:text-3xl">{portlandTime}</span>
         </span>
       )}
     </div>

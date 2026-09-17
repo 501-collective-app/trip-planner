@@ -1,7 +1,7 @@
 import { CalendarDays, Wallet, ListChecks, Users, Settings, Plane, Contact as ContactIcon } from 'lucide-react'
 import { BrandMark } from './BrandMark'
 
-export type Tab = 'calendar' | 'flights' | 'budget' | 'activities' | 'team' | 'contacts' | 'settings'
+export type Tab = 'overview' | 'calendar' | 'flights' | 'budget' | 'activities' | 'team' | 'contacts' | 'settings'
 
 export const NAV: { id: Tab; label: string; icon: typeof CalendarDays }[] = [
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
@@ -16,9 +16,12 @@ export const NAV: { id: Tab; label: string; icon: typeof CalendarDays }[] = [
 export function Sidebar({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   return (
     <aside className="hidden h-full w-60 shrink-0 flex-col bg-brand-dark md:flex">
-      <div className="flex justify-center overflow-hidden border-b border-white/10 py-6">
+      <button
+        onClick={() => onTab('overview')}
+        className="flex justify-center overflow-hidden border-b border-white/10 py-6 hover:bg-white/5"
+      >
         <BrandMark badge />
-      </div>
+      </button>
 
       <nav className="flex-1 space-y-1 p-3">
         {NAV.map(({ id, label, icon: Icon }) => (
