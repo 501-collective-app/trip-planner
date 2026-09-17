@@ -17,7 +17,7 @@ export function WeatherChip({
   if (compact) {
     if (loading || !day) return null
     return (
-      <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-stone-500">
+      <span className="inline-flex items-center gap-1 text-base font-medium text-stone-500">
         <span>{weatherEmoji(day.code)}</span>
         <span>{Math.round(day.tempMaxF)}&deg;</span>
       </span>

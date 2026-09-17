@@ -1,4 +1,4 @@
-import type { ActivityOption, CalendarEvent, Destination, Expense, FlightDetails, MemberSensitive, TeamMember, Trip } from '../types'
+import type { ActivityOption, CalendarEvent, Contact, Destination, Expense, FlightDetails, MemberSensitive, TeamMember, Trip } from '../types'
 
 // Supabase rows are snake_case; the app's types are camelCase. These convert both ways.
 
@@ -12,9 +12,17 @@ export interface TripRow {
   archived: boolean
   created_by: string | null
   created_at: string
+  dropbox_folder: string | null
 }
 export function tripFromRow(r: TripRow): Trip {
-  return { name: r.name, organization: r.organization, startDate: r.start_date, endDate: r.end_date, totalBudget: r.total_budget }
+  return {
+    name: r.name,
+    organization: r.organization,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    totalBudget: r.total_budget,
+    dropboxFolder: r.dropbox_folder ?? undefined,
+  }
 }
 export function tripToRow(t: Partial<Trip>) {
   const row: Record<string, unknown> = {}
@@ -23,6 +31,7 @@ export function tripToRow(t: Partial<Trip>) {
   if (t.startDate !== undefined) row.start_date = t.startDate
   if (t.endDate !== undefined) row.end_date = t.endDate
   if (t.totalBudget !== undefined) row.total_budget = t.totalBudget
+  if (t.dropboxFolder !== undefined) row.dropbox_folder = t.dropboxFolder || null
   return row
 }
 
@@ -219,6 +228,28 @@ export function flightDetailsToRow(f: Partial<FlightDetails>) {
   if (f.departureTime !== undefined) row.departure_time = f.departureTime
   if (f.arrivalTime !== undefined) row.arrival_time = f.arrivalTime
   if (f.seats !== undefined) row.seats = f.seats
+  return row
+}
+
+export interface ContactRow {
+  id: string
+  trip_id: string
+  name: string
+  role: string | null
+  phone: string | null
+  email: string | null
+  notes: string | null
+}
+export function contactFromRow(r: ContactRow): Contact {
+  return { id: r.id, name: r.name, role: r.role ?? undefined, phone: r.phone ?? undefined, email: r.email ?? undefined, notes: r.notes ?? undefined }
+}
+export function contactToRow(c: Partial<Contact>) {
+  const row: Record<string, unknown> = {}
+  if (c.name !== undefined) row.name = c.name
+  if (c.role !== undefined) row.role = c.role
+  if (c.phone !== undefined) row.phone = c.phone
+  if (c.email !== undefined) row.email = c.email
+  if (c.notes !== undefined) row.notes = c.notes
   return row
 }
 

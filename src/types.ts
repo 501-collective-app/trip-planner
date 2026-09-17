@@ -97,12 +97,22 @@ export interface FlightDetails {
   seats: Record<string, string> // TeamMember.id -> seat, e.g. "14C"
 }
 
+export interface Contact {
+  id: string
+  name: string
+  role?: string
+  phone?: string
+  email?: string
+  notes?: string
+}
+
 export interface Trip {
   name: string
   organization: string
   startDate: string
   endDate: string
   totalBudget: number
+  dropboxFolder?: string // overrides the auto-derived "/<trip name>/Receipts" path
 }
 
 export interface TripState {
@@ -114,6 +124,7 @@ export interface TripState {
   options: ActivityOption[]
   sensitiveByMember: Record<string, MemberSensitive> // keyed by TeamMember.id
   flightsByEvent: Record<string, FlightDetails> // keyed by CalendarEvent.id
+  contacts: Contact[]
 }
 
 export interface TripRecord extends TripState {

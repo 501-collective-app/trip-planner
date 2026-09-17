@@ -18,8 +18,8 @@ export function BrandMark({
 
   if (!badge) return img
 
-  const circleSize = { sm: 'h-14 w-14', md: 'h-[190px] w-[190px]', lg: 'h-72 w-72', huge: 'h-[70vh] w-[70vh]' }[size]
-  const circleColor = on === 'dark' ? 'bg-brand-mint/10' : 'bg-brand-mint/20'
+  const circleSize = { sm: 'h-14 w-14', md: 'h-[150px] w-[150px]', lg: 'h-72 w-72', huge: 'h-[70vh] w-[70vh]' }[size]
+  const circleColor = on === 'dark' ? 'bg-white/10' : 'bg-white/40'
 
   return (
     <div className="relative inline-flex items-center justify-center">

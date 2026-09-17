@@ -3,6 +3,8 @@ import type { RealtimeChannel, Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabaseClient'
 import { makeSampleTrip, makeBlankTrip } from './data/seed'
 import {
+  contactFromRow,
+  contactToRow,
   destinationFromRow,
   destinationToRow,
   eventFromRow,
@@ -19,6 +21,7 @@ import {
   sensitiveToRow,
   tripFromRow,
   tripToRow,
+  type ContactRow,
   type DestinationRow,
   type EventRow,
   type ExpenseRow,
@@ -31,6 +34,7 @@ import {
 import type {
   ActivityOption,
   CalendarEvent,
+  Contact,
   Destination,
   Expense,
   FlightDetails,
@@ -105,6 +109,10 @@ interface Store {
 
   toggleOption: (id: string) => void
   addOption: (o: Omit<ActivityOption, 'id'>) => void
+
+  addContact: (c: Omit<Contact, 'id'>) => void
+  updateContact: (id: string, patch: Partial<Contact>) => void
+  removeContact: (id: string) => void
 
   resetActiveTripToSample: () => Promise<void>
 }
@@ -261,6 +269,7 @@ export const useStore = create<Store>((set, get) => ({
       { data: options },
       { data: sensitive },
       { data: flights },
+      { data: contacts },
     ] = await Promise.all([
       supabase.from('trip_members').select('*').eq('trip_id', id),
       supabase.from('destinations').select('*').eq('trip_id', id),
@@ -269,6 +278,7 @@ export const useStore = create<Store>((set, get) => ({
       supabase.from('activity_options').select('*').eq('trip_id', id),
       supabase.from('trip_member_sensitive').select('*').eq('trip_id', id),
       supabase.from('flight_details').select('*').eq('trip_id', id),
+      supabase.from('contacts').select('*').eq('trip_id', id),
     ])
 
     if (get().activeTripId !== id) return // switched again before this resolved
@@ -296,6 +306,7 @@ export const useStore = create<Store>((set, get) => ({
         flightsByEvent: Object.fromEntries(
           ((flights as FlightDetailsRow[] | null) ?? []).map((r) => [r.event_id, flightDetailsFromRow(r)]),
         ),
+        contacts: ((contacts as ContactRow[] | null) ?? []).map(contactFromRow),
       },
       loadingActiveTrip: false,
     })
@@ -360,6 +371,10 @@ export const useStore = create<Store>((set, get) => ({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `trip_id=eq.${id}` }, (payload) => {
         if (payload.eventType === 'DELETE') patchActive((t) => ({ ...t, expenses: removeById(t.expenses, (payload.old as ExpenseRow).id) }))
         else patchActive((t) => ({ ...t, expenses: upsertById(t.expenses, expenseFromRow(payload.new as ExpenseRow)) }))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts', filter: `trip_id=eq.${id}` }, (payload) => {
+        if (payload.eventType === 'DELETE') patchActive((t) => ({ ...t, contacts: removeById(t.contacts, (payload.old as ContactRow).id) }))
+        else patchActive((t) => ({ ...t, contacts: upsertById(t.contacts, contactFromRow(payload.new as ContactRow)) }))
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_options', filter: `trip_id=eq.${id}` }, (payload) => {
         if (payload.eventType === 'DELETE') patchActive((t) => ({ ...t, options: removeById(t.options, (payload.old as OptionRow).id) }))
@@ -595,6 +610,27 @@ export const useStore = create<Store>((set, get) => ({
     supabase.from('activity_options').insert({ id, trip_id: tripId, ...optionToRow(o) })
   },
 
+  addContact: (c) => {
+    const tripId = get().activeTripId
+    if (!tripId) return
+    const id = crypto.randomUUID()
+    const item: Contact = { ...c, id }
+    set((s) => (s.activeTripData ? { activeTripData: { ...s.activeTripData, contacts: [...s.activeTripData.contacts, item] } } : {}))
+    supabase.from('contacts').insert({ id, trip_id: tripId, ...contactToRow(c) })
+  },
+  updateContact: (id, patch) => {
+    set((s) =>
+      s.activeTripData
+        ? { activeTripData: { ...s.activeTripData, contacts: s.activeTripData.contacts.map((c) => (c.id === id ? { ...c, ...patch } : c)) } }
+        : {},
+    )
+    supabase.from('contacts').update(contactToRow(patch)).eq('id', id)
+  },
+  removeContact: (id) => {
+    set((s) => (s.activeTripData ? { activeTripData: { ...s.activeTripData, contacts: removeById(s.activeTripData.contacts, id) } } : {}))
+    supabase.from('contacts').delete().eq('id', id)
+  },
+
   resetActiveTripToSample: async () => {
     const tripId = get().activeTripId
     if (!tripId) return
@@ -649,6 +685,7 @@ const EMPTY_TRIP: TripRecord = {
   options: [],
   sensitiveByMember: {},
   flightsByEvent: {},
+  contacts: [],
 }
 
 export function useActiveTrip(): TripRecord {

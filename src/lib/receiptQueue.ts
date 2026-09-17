@@ -4,12 +4,14 @@
 
 import { createSharedLink, uploadToDropbox } from './dropbox'
 import { useDropboxStore } from '../dropboxStore'
+import { receiptFolder } from './dropboxPath'
 
 export interface QueuedReceipt {
   id: string
   blob: Blob
   tripId: string
   tripName: string
+  dropboxFolder?: string
   createdAt: string
 }
 
@@ -71,9 +73,8 @@ export async function flushReceiptQueue(): Promise<void> {
 
     for (const item of items) {
       try {
-        const safeTrip = item.tripName.replace(/[^a-z0-9]+/gi, '-').slice(0, 40)
         const stamp = item.createdAt.replace(/[:.]/g, '-')
-        const path = `/${safeTrip}/Receipts/${stamp}.jpg`
+        const path = `${receiptFolder(item.tripName, item.dropboxFolder)}/${stamp}.jpg`
         const uploadedPath = await uploadToDropbox(token, path, item.blob)
         await createSharedLink(token, uploadedPath)
         await removeQueuedReceipt(item.id)

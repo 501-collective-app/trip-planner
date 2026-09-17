@@ -4,6 +4,7 @@ import { useStore, useActiveTrip } from '../store'
 import { useDropboxStore } from '../dropboxStore'
 import { geocodeCity } from '../lib/geocode'
 import { getQueuedReceipts } from '../lib/receiptQueue'
+import { receiptFolder } from '../lib/dropboxPath'
 import { Modal } from '../components/Modal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 
@@ -136,6 +137,33 @@ function AccountSection() {
   )
 }
 
+function DropboxFolderField() {
+  const active = useActiveTrip()
+  const { trip } = active
+  const updateTrip = useStore((s) => s.updateTrip)
+  const [value, setValue] = useState(trip.dropboxFolder ?? '')
+  const autoPath = receiptFolder(trip.name)
+
+  return (
+    <div className="mt-4 border-t border-stone-100 pt-4">
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-stone-500">Receipts folder for this trip (in your Dropbox)</span>
+        <input
+          className="input"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={() => updateTrip({ dropboxFolder: value.trim() || undefined })}
+          placeholder={autoPath}
+        />
+      </label>
+      <p className="mt-1 text-xs text-stone-400">
+        Leave blank to auto-use <span className="font-mono">{autoPath}</span>. Each trip can point at its own folder — set this
+        per trip in its own Settings page.
+      </p>
+    </div>
+  )
+}
+
 function DropboxSection() {
   const appKey = useDropboxStore((s) => s.appKey)
   const setAppKey = useDropboxStore((s) => s.setAppKey)
@@ -208,6 +236,8 @@ function DropboxSection() {
           </p>
         </div>
       )}
+
+      <DropboxFolderField />
     </section>
   )
 }

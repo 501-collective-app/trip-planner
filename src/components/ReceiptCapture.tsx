@@ -2,9 +2,11 @@ import { useRef, useState } from 'react'
 import { Camera, Check, ExternalLink, Loader2 } from 'lucide-react'
 import { useDropboxStore } from '../dropboxStore'
 import { createSharedLink, uploadToDropbox } from '../lib/dropbox'
+import { receiptFolder } from '../lib/dropboxPath'
 
 export function ReceiptCapture({
   tripName,
+  dropboxFolder,
   expenseDate,
   expenseDescription,
   receiptPath,
@@ -12,6 +14,7 @@ export function ReceiptCapture({
   onChange,
 }: {
   tripName: string
+  dropboxFolder?: string
   expenseDate: string
   expenseDescription: string
   receiptPath?: string
@@ -31,10 +34,9 @@ export function ReceiptCapture({
     }
     setStatus('uploading')
     try {
-      const safeTrip = (tripName || 'Trip').replace(/[^a-z0-9]+/gi, '-').slice(0, 40)
       const safeDesc = (expenseDescription || 'receipt').replace(/[^a-z0-9]+/gi, '-').slice(0, 40)
       const ext = file.type.includes('png') ? 'png' : 'jpg'
-      const path = `/${safeTrip}/Receipts/${expenseDate}-${safeDesc}.${ext}`
+      const path = `${receiptFolder(tripName, dropboxFolder)}/${expenseDate}-${safeDesc}.${ext}`
       const uploadedPath = await uploadToDropbox(token, path, file)
       const url = await createSharedLink(token, uploadedPath)
       onChange(uploadedPath, url ?? undefined)

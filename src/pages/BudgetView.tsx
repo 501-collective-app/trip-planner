@@ -82,7 +82,7 @@ export function BudgetView() {
           <div className="flex items-center justify-between border-b border-stone-100 px-5 py-3.5">
             <h3 className="text-sm font-semibold text-stone-900">Expense log</h3>
             <div className="flex gap-2">
-              <ScanReceiptsButton tripId={active.id} tripName={trip.name} />
+              <ScanReceiptsButton tripId={active.id} tripName={trip.name} dropboxFolder={trip.dropboxFolder} />
               <button
                 onClick={() => setAdding(true)}
                 className="flex items-center gap-1 rounded-lg bg-brand-mint-dark px-3 py-1.5 text-xs font-medium text-white hover:brightness-95"
@@ -247,6 +247,7 @@ function AddExpense({ onClose }: { onClose: () => void }) {
 
         <ReceiptCapture
           tripName={trip.name}
+          dropboxFolder={trip.dropboxFolder}
           expenseDate={date}
           expenseDescription={description}
           receiptPath={receiptPath}

@@ -8,6 +8,7 @@ import { FlightsView } from './pages/FlightsView'
 import { BudgetView } from './pages/BudgetView'
 import { ActivitiesView } from './pages/ActivitiesView'
 import { TeamView } from './pages/TeamView'
+import { ContactsView } from './pages/ContactsView'
 import { SettingsView } from './pages/SettingsView'
 
 const TITLES: Record<Tab, string> = {
@@ -16,6 +17,7 @@ const TITLES: Record<Tab, string> = {
   budget: 'Budget',
   activities: 'Activities',
   team: 'Team',
+  contacts: 'Key Contacts',
   settings: 'Settings',
 }
 
@@ -34,6 +36,7 @@ export default function App() {
           {tab === 'budget' && <BudgetView />}
           {tab === 'activities' && <ActivitiesView />}
           {tab === 'team' && <TeamView />}
+          {tab === 'contacts' && <ContactsView />}
           {tab === 'settings' && <SettingsView />}
         </div>
       </main>

@@ -1,7 +1,7 @@
-import { CalendarDays, Wallet, ListChecks, Users, Settings, Plane } from 'lucide-react'
+import { CalendarDays, Wallet, ListChecks, Users, Settings, Plane, Contact as ContactIcon } from 'lucide-react'
 import { BrandMark } from './BrandMark'
 
-export type Tab = 'calendar' | 'flights' | 'budget' | 'activities' | 'team' | 'settings'
+export type Tab = 'calendar' | 'flights' | 'budget' | 'activities' | 'team' | 'contacts' | 'settings'
 
 export const NAV: { id: Tab; label: string; icon: typeof CalendarDays }[] = [
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
@@ -9,6 +9,7 @@ export const NAV: { id: Tab; label: string; icon: typeof CalendarDays }[] = [
   { id: 'budget', label: 'Budget', icon: Wallet },
   { id: 'activities', label: 'Activities', icon: ListChecks },
   { id: 'team', label: 'Team', icon: Users },
+  { id: 'contacts', label: 'Contacts', icon: ContactIcon },
   { id: 'settings', label: 'Settings', icon: Settings },
 ]
 

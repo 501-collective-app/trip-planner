@@ -1,82 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plane, Plus, Trash2, RadioTower, RotateCw } from 'lucide-react'
 import { useStore, useActiveTrip } from '../store'
 import { Modal } from '../components/Modal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { fetchFlightStatus, type FlightStatus } from '../lib/flightStatus'
+import { fmtAmPm, fmtAmPmFromIso, homeAirport, isReturnLeg, sortedFlightEvents } from '../lib/flightHelpers'
 import type { CalendarEvent } from '../types'
-
-function fmtUtc(iso: string | null) {
-  if (!iso) return null
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-}
-
-function LiveStatus({ flightNumber, date }: { flightNumber?: string; date: string }) {
-  const [status, setStatus] = useState<FlightStatus | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  async function load() {
-    if (!flightNumber) return
-    setLoading(true)
-    setError(null)
-    const { data, error } = await fetchFlightStatus(flightNumber, date)
-    setStatus(data)
-    setError(error)
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flightNumber, date])
-
-  if (!flightNumber) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-xs text-stone-400">
-        <RadioTower size={13} />
-        Add a flight number to get live status.
-      </div>
-    )
-  }
-
-  return (
-    <div className="rounded-lg border border-stone-200 px-3 py-2.5">
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-stone-400">
-          <RadioTower size={13} />
-          Live status
-        </span>
-        <button onClick={load} disabled={loading} className="text-stone-400 hover:text-brand-mint-dark disabled:opacity-40">
-          <RotateCw size={13} className={loading ? 'animate-spin' : ''} />
-        </button>
-      </div>
-      {loading && !status && <p className="text-xs text-stone-400">Checking&hellip;</p>}
-      {error && <p className="text-xs text-red-500">{error === 'Not configured' ? 'Flight status API not set up yet.' : error}</p>}
-      {status && (
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div>
-            <div className="font-medium text-stone-700">{status.status ?? 'Unknown'}</div>
-            <div className="text-stone-400">Status</div>
-          </div>
-          <div>
-            <div className="font-medium text-stone-700">
-              {status.departure.gate ? `Gate ${status.departure.gate}` : '—'}
-              {status.departure.terminal ? ` (T${status.departure.terminal})` : ''}
-            </div>
-            <div className="text-stone-400">{fmtUtc(status.departure.revisedTime ?? status.departure.scheduledTime) ?? 'Departure'}</div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function fmtDateTime(iso?: string) {
-  if (!iso) return null
-  const d = new Date(iso)
-  return d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-}
 
 function initials(name: string) {
   return name.split(' ').map((p) => p[0]).join('').slice(0, 2)
@@ -84,32 +13,40 @@ function initials(name: string) {
 
 export function FlightsView() {
   const active = useActiveTrip()
-  const flightEvents = active.events.filter((e) => e.category === 'Flights').sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))
+  const flights = useMemo(() => sortedFlightEvents(active.events, active.flightsByEvent), [active.events, active.flightsByEvent])
+  const home = useMemo(() => homeAirport(flights), [flights])
   const [adding, setAdding] = useState(false)
   const [openEventId, setOpenEventId] = useState<string | null>(null)
 
   return (
-    <div className="mx-auto max-w-3xl px-3 py-4 md:px-6 md:py-6">
-      <div className="mb-6 flex items-center justify-between">
-        <p className="text-sm text-stone-500">Every flight on this trip, with seat assignments.</p>
-        <button
-          onClick={() => setAdding(true)}
-          className="flex items-center gap-1 rounded-lg bg-brand-mint-dark px-3 py-1.5 text-xs font-medium text-white hover:brightness-95"
-        >
-          <Plus size={14} />
-          Add flight
-        </button>
-      </div>
+    <div className="px-3 py-4 md:px-6 md:py-6">
+      <div className="mx-auto max-w-[1600px]">
+        <div className="mb-6 flex items-center justify-between">
+          <p className="text-base text-stone-500">Every flight on this trip, with seat assignments and live status.</p>
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1 rounded-lg bg-brand-mint-dark px-3 py-1.5 text-xs font-medium text-white hover:brightness-95"
+          >
+            <Plus size={14} />
+            Add flight
+          </button>
+        </div>
 
-      <div className="space-y-3">
-        {flightEvents.length === 0 && (
-          <div className="rounded-xl border border-dashed border-stone-300 px-5 py-8 text-center text-sm text-stone-400">
-            No flights added yet.
-          </div>
-        )}
-        {flightEvents.map((ev) => (
-          <FlightCard key={ev.id} event={ev} onOpen={() => setOpenEventId(ev.id)} />
-        ))}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {flights.length === 0 && (
+            <div className="col-span-full rounded-xl border border-dashed border-stone-300 px-5 py-10 text-center text-base text-stone-400">
+              No flights added yet.
+            </div>
+          )}
+          {flights.map(({ event, flight }) => (
+            <FlightCard
+              key={event.id}
+              event={event}
+              isReturn={isReturnLeg(flight, home)}
+              onOpen={() => setOpenEventId(event.id)}
+            />
+          ))}
+        </div>
       </div>
 
       {adding && <AddFlightForm onClose={() => setAdding(false)} />}
@@ -118,49 +55,95 @@ export function FlightsView() {
   )
 }
 
-function FlightCard({ event, onOpen }: { event: CalendarEvent; onOpen: () => void }) {
+function FlightCard({ event, isReturn, onOpen }: { event: CalendarEvent; isReturn: boolean; onOpen: () => void }) {
   const active = useActiveTrip()
   const flight = active.flightsByEvent[event.id]
   const attendees = active.team.filter((m) => event.attendeeIds.includes(m.id))
 
   return (
-    <button onClick={onOpen} className="flex w-full flex-col gap-2 rounded-xl border border-stone-200 bg-white p-4 text-left hover:border-brand-mint-dark">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-mint/15 text-brand-mint-dark">
-            <Plane size={16} className="rotate-45" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-stone-900">
-              {flight?.airline || event.title}
-              {flight?.flightNumber ? ` ${flight.flightNumber}` : ''}
-            </div>
-            <div className="text-xs text-stone-500">
-              {flight?.departureAirport && flight?.arrivalAirport
-                ? `${flight.departureAirport} → ${flight.arrivalAirport}`
-                : event.title}
-            </div>
-          </div>
+    <button
+      onClick={onOpen}
+      className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-5 text-left hover:border-brand-mint-dark hover:shadow-md"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-mint/15 text-brand-mint-dark">
+          <Plane size={22} className={isReturn ? 'rotate-[225deg]' : 'rotate-45'} />
         </div>
-        {!!event.cost && <div className="text-sm font-semibold text-stone-600">${event.cost.toLocaleString()}</div>}
+        <div className="min-w-0">
+          <div className="truncate text-lg font-semibold text-stone-900">
+            {flight?.airline || event.title}
+          </div>
+          <div className="truncate text-base text-stone-500">{flight?.flightNumber ?? event.title}</div>
+        </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-stone-500">{fmtDateTime(flight?.departureTime) ?? `${event.date} ${event.time ?? ''}`}</div>
-        <div className="flex -space-x-1.5">
-          {attendees.slice(0, 6).map((m) => (
-            <div
-              key={m.id}
-              title={`${m.name}${flight?.seats[m.id] ? ` · ${flight.seats[m.id]}` : ''}`}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-white text-[10px] font-semibold text-white"
-              style={{ background: m.color }}
-            >
-              {initials(m.name)}
+      {flight?.departureAirport && flight?.arrivalAirport && (
+        <div className="text-2xl font-bold text-stone-800">
+          {flight.departureAirport} <span className="text-stone-300">&rarr;</span> {flight.arrivalAirport}
+        </div>
+      )}
+
+      <div className="space-y-1 text-base">
+        <div className="text-stone-600">
+          Take off: <span className="font-semibold">{flight?.departureTime ? fmtAmPmFromIso(flight.departureTime) : fmtAmPm(event.time ?? '00:00')}</span>
+          {flight?.departureAirport && <span className="text-stone-400"> {flight.departureAirport}</span>}
+        </div>
+        {flight?.arrivalTime && (
+          <div className="font-semibold text-red-400">
+            Land: {fmtAmPmFromIso(flight.arrivalTime)}
+            {flight.arrivalAirport && <span> {flight.arrivalAirport}</span>}
+          </div>
+        )}
+        <div className="text-sm text-stone-400">{event.date}</div>
+      </div>
+
+      <LiveStatusCompact flightNumber={flight?.flightNumber} date={event.date} />
+
+      {attendees.length > 0 && (
+        <div className="flex flex-wrap gap-2 border-t border-stone-100 pt-3">
+          {attendees.map((m) => (
+            <div key={m.id} className="flex items-center gap-1.5 rounded-full bg-stone-50 py-1 pl-1 pr-2.5 text-sm">
+              <span
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+                style={{ background: m.color }}
+              >
+                {initials(m.name)}
+              </span>
+              <span className="text-stone-700">{m.name}</span>
+              {flight?.seats[m.id] && <span className="font-semibold text-stone-500">{flight.seats[m.id]}</span>}
             </div>
           ))}
         </div>
-      </div>
+      )}
     </button>
+  )
+}
+
+function LiveStatusCompact({ flightNumber, date }: { flightNumber?: string; date: string }) {
+  const [status, setStatus] = useState<FlightStatus | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!flightNumber) return
+    setLoading(true)
+    fetchFlightStatus(flightNumber, date).then(({ data, error }) => {
+      setStatus(data)
+      setError(error)
+      setLoading(false)
+    })
+  }, [flightNumber, date])
+
+  if (!flightNumber) return null
+  if (loading) return <div className="text-sm text-stone-400">Checking live status&hellip;</div>
+  if (error || !status) return null
+
+  return (
+    <div className="flex items-center gap-1.5 rounded-lg bg-stone-50 px-2.5 py-1.5 text-sm font-medium text-stone-600">
+      <RadioTower size={13} className="text-brand-mint-dark" />
+      {status.status ?? 'Status unavailable'}
+      {status.departure.gate && <span className="text-stone-400">&middot; Gate {status.departure.gate}</span>}
+    </div>
   )
 }
 
@@ -291,6 +274,67 @@ function AddFlightForm({ onClose }: { onClose: () => void }) {
   )
 }
 
+function LiveStatus({ flightNumber, date }: { flightNumber?: string; date: string }) {
+  const [status, setStatus] = useState<FlightStatus | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  async function load() {
+    if (!flightNumber) return
+    setLoading(true)
+    setError(null)
+    const { data, error } = await fetchFlightStatus(flightNumber, date)
+    setStatus(data)
+    setError(error)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flightNumber, date])
+
+  if (!flightNumber) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-sm text-stone-400">
+        <RadioTower size={14} />
+        Add a flight number to get live status.
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-stone-200 px-3 py-2.5">
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-stone-400">
+          <RadioTower size={14} />
+          Live status
+        </span>
+        <button onClick={load} disabled={loading} className="text-stone-400 hover:text-brand-mint-dark disabled:opacity-40">
+          <RotateCw size={14} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+      {loading && !status && <p className="text-sm text-stone-400">Checking&hellip;</p>}
+      {error && <p className="text-sm text-red-500">{error === 'Not configured' ? 'Flight status API not set up yet.' : error}</p>}
+      {status && (
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <div className="font-medium text-stone-700">{status.status ?? 'Unknown'}</div>
+            <div className="text-stone-400">Status</div>
+          </div>
+          <div>
+            <div className="font-medium text-stone-700">
+              {status.departure.gate ? `Gate ${status.departure.gate}` : '—'}
+              {status.departure.terminal ? ` (T${status.departure.terminal})` : ''}
+            </div>
+            <div className="text-stone-400">{status.departure.revisedTime ? fmtAmPmFromIso(status.departure.revisedTime) : 'Departure'}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function FlightDetailModal({ eventId, onClose }: { eventId: string; onClose: () => void }) {
   const active = useActiveTrip()
   const event = active.events.find((e) => e.id === eventId)
@@ -315,12 +359,19 @@ function FlightDetailModal({ eventId, onClose }: { eventId: string; onClose: () 
   return (
     <Modal title={flight?.airline ? `${flight.airline} ${flight.flightNumber ?? ''}`.trim() : event.title} onClose={onClose}>
       <div className="space-y-4">
-        <div className="rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-500">
-          {fmtDateTime(flight?.departureTime) ?? `${event.date} ${event.time ?? ''}`}
-          {flight?.arrivalTime && <> &rarr; {fmtDateTime(flight.arrivalTime)}</>}
+        <div className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-600">
+          Take off: <span className="font-semibold">{flight?.departureTime ? fmtAmPmFromIso(flight.departureTime) : `${event.date} ${event.time ?? ''}`}</span>
+          {flight?.departureAirport && ` ${flight.departureAirport}`}
+          {flight?.arrivalTime && (
+            <div className="font-semibold text-red-400">
+              Land: {fmtAmPmFromIso(flight.arrivalTime)}
+              {flight.arrivalAirport && ` ${flight.arrivalAirport}`}
+            </div>
+          )}
         </div>
 
         <LiveStatus flightNumber={flight?.flightNumber} date={event.date} />
+
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-stone-500">Airline</span>

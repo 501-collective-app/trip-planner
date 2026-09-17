@@ -3,10 +3,21 @@ import { Camera, Check, CloudOff, Loader2, Plus, X } from 'lucide-react'
 import { useDropboxStore } from '../dropboxStore'
 import { createSharedLink, uploadToDropbox } from '../lib/dropbox'
 import { queueReceipt, flushReceiptQueue } from '../lib/receiptQueue'
+import { receiptFolder } from '../lib/dropboxPath'
 
 type Step = 'capturing' | 'confirm' | 'saving' | 'another'
 
-export function ScanReceiptsFlow({ tripId, tripName, onClose }: { tripId: string; tripName: string; onClose: () => void }) {
+export function ScanReceiptsFlow({
+  tripId,
+  tripName,
+  dropboxFolder,
+  onClose,
+}: {
+  tripId: string
+  tripName: string
+  dropboxFolder?: string
+  onClose: () => void
+}) {
   const [step, setStep] = useState<Step>('capturing')
   const [photo, setPhoto] = useState<{ file: File; previewUrl: string } | null>(null)
   const [queued, setQueued] = useState(false)
@@ -40,9 +51,8 @@ export function ScanReceiptsFlow({ tripId, tripName, onClose }: { tripId: string
       try {
         const token = await getValidAccessToken()
         if (token) {
-          const safeTrip = tripName.replace(/[^a-z0-9]+/gi, '-').slice(0, 40)
           const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-          const path = `/${safeTrip}/Receipts/${stamp}.jpg`
+          const path = `${receiptFolder(tripName, dropboxFolder)}/${stamp}.jpg`
           const uploadedPath = await uploadToDropbox(token, path, photo.file)
           await createSharedLink(token, uploadedPath)
           succeeded = true
@@ -53,7 +63,7 @@ export function ScanReceiptsFlow({ tripId, tripName, onClose }: { tripId: string
     }
 
     if (!succeeded) {
-      await queueReceipt({ id: crypto.randomUUID(), blob: photo.file, tripId, tripName, createdAt: new Date().toISOString() })
+      await queueReceipt({ id: crypto.randomUUID(), blob: photo.file, tripId, tripName, dropboxFolder, createdAt: new Date().toISOString() })
       setQueued(true)
     }
 
@@ -158,7 +168,17 @@ export function ScanReceiptsFlow({ tripId, tripName, onClose }: { tripId: string
   )
 }
 
-export function ScanReceiptsButton({ tripId, tripName, className }: { tripId: string; tripName: string; className?: string }) {
+export function ScanReceiptsButton({
+  tripId,
+  tripName,
+  dropboxFolder,
+  className,
+}: {
+  tripId: string
+  tripName: string
+  dropboxFolder?: string
+  className?: string
+}) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -177,7 +197,7 @@ export function ScanReceiptsButton({ tripId, tripName, className }: { tripId: st
         <Camera size={14} />
         Scan receipts
       </button>
-      {open && <ScanReceiptsFlow tripId={tripId} tripName={tripName} onClose={() => setOpen(false)} />}
+      {open && <ScanReceiptsFlow tripId={tripId} tripName={tripName} dropboxFolder={dropboxFolder} onClose={() => setOpen(false)} />}
     </>
   )
 }
