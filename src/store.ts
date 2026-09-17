@@ -111,6 +111,7 @@ interface Store {
 
 let realtimeChannel: RealtimeChannel | null = null
 let tripNameDebounce: ReturnType<typeof setTimeout> | null = null
+let seedingPromise: Promise<void> | null = null
 
 async function ensureSelfMembership(tripId: string, userId: string, email: string, name: string) {
   const { data: existing } = await supabase.from('trip_members').select('id').eq('trip_id', tripId).ilike('email', email).maybeSingle()
@@ -129,7 +130,10 @@ async function seedSampleTripForUser(userId: string, email: string, name: string
 
   // Must exist before any child-row insert: every other table's RLS policy requires
   // the actor to already be a trip member, and the creator isn't one until this runs.
-  await ensureSelfMembership(tripId, userId, email, name)
+  const selfId = crypto.randomUUID()
+  await supabase
+    .from('trip_members')
+    .insert({ id: selfId, trip_id: tripId, user_id: userId, email, name, role: 'Trip Lead', color: '#81e0ae', status: 'confirmed', member_type: 'trip_leader' })
 
   const destIdMap = new Map<string, string>()
   for (const d of sample.destinations) {
@@ -138,9 +142,15 @@ async function seedSampleTripForUser(userId: string, email: string, name: string
     await supabase.from('destinations').insert({ id: newId, trip_id: tripId, ...destinationToRow(d) })
   }
 
+  const memberIdMap = new Map<string, string>()
   for (const m of sample.team) {
-    if (m.email.toLowerCase() === email.toLowerCase()) continue // already added as self above
-    await supabase.from('trip_members').insert({ id: crypto.randomUUID(), trip_id: tripId, ...memberToRow(m) })
+    if (m.email.toLowerCase() === email.toLowerCase()) {
+      memberIdMap.set(m.id, selfId) // this placeholder IS the signed-in user; point it at their real row
+      continue
+    }
+    const newId = crypto.randomUUID()
+    memberIdMap.set(m.id, newId)
+    await supabase.from('trip_members').insert({ id: newId, trip_id: tripId, ...memberToRow(m) })
   }
 
   for (const e of sample.events) {
@@ -149,6 +159,7 @@ async function seedSampleTripForUser(userId: string, email: string, name: string
       trip_id: tripId,
       ...eventToRow(e),
       destination_id: destIdMap.get(e.destinationId) ?? null,
+      attendee_ids: e.attendeeIds.map((pid) => memberIdMap.get(pid)).filter((id): id is string => !!id),
     })
   }
   for (const ex of sample.expenses) {
@@ -214,8 +225,13 @@ export const useStore = create<Store>((set, get) => ({
     if (rows.length === 0) {
       const session = get().session
       if (session) {
-        const name = session.user.user_metadata?.name ?? session.user.email?.split('@')[0] ?? 'Trip Lead'
-        await seedSampleTripForUser(session.user.id, session.user.email!, name)
+        if (!seedingPromise) {
+          const name = session.user.user_metadata?.name ?? session.user.email?.split('@')[0] ?? 'Trip Lead'
+          seedingPromise = seedSampleTripForUser(session.user.id, session.user.email!, name).finally(() => {
+            seedingPromise = null
+          })
+        }
+        await seedingPromise
         return get().loadTrips()
       }
     }
