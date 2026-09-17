@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Archivo Black", system-ui, sans-serif;
+  --font-sans: "Outfit", system-ui, "Segoe UI", Roboto, sans-serif;
+
+  --color-brand-black: #000000;
+  --color-brand-dark: #072225;
+  --color-brand-dark-hover: #0e3a3e;
+  --color-brand-mint: #81e0ae;
+  --color-brand-mint-dark: #5cc98d;
+  --color-brand-yellow: #ffc800;
+  --color-brand-white: #ffffff;
+}
+
+:root {
+  color-scheme: light;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f6f5f2;
+  color: #16211f;
+  overscroll-behavior-y: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d8d5cd;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #e7e5e4;
+  background: #fff;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #1f2328;
+  outline: none;
+}
+.input:focus {
+  border-color: var(--color-brand-mint);
+  box-shadow: 0 0 0 3px rgba(129, 224, 174, 0.35);
+}

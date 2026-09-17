@@ -1,0 +1,99 @@
+export type ExpenseCategory =
+  | 'Lodging'
+  | 'Flights'
+  | 'Ground Transport'
+  | 'Food'
+  | 'Activities'
+  | 'Supplies'
+  | 'Other'
+
+export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
+  'Lodging',
+  'Flights',
+  'Ground Transport',
+  'Food',
+  'Activities',
+  'Supplies',
+  'Other',
+]
+
+export interface Destination {
+  id: string
+  city: string
+  country: string
+  lat: number
+  lon: number
+  arrive: string // ISO date
+  depart: string // ISO date
+  notes?: string
+}
+
+export interface TeamMember {
+  id: string
+  name: string
+  role: string
+  email: string
+  color: string
+  status: 'confirmed' | 'invited'
+}
+
+export interface CalendarEvent {
+  id: string
+  date: string // ISO date
+  time?: string // "HH:mm"
+  title: string
+  destinationId: string
+  category: ExpenseCategory
+  cost?: number
+  attendeeIds: string[]
+  notes?: string
+  fromOptionId?: string
+}
+
+export interface Expense {
+  id: string
+  date: string
+  amount: number // always USD equivalent, used for all budget math
+  currency: string // ISO 4217 code the expense was actually entered in
+  originalAmount: number // amount in `currency` as entered
+  fxRateToUsd: number // rate used at entry time (1 for USD)
+  category: ExpenseCategory
+  description: string
+  destinationId?: string
+  paidBy?: string
+  receiptPath?: string // Dropbox path, once uploaded
+  receiptUrl?: string // Dropbox shared link, once created
+}
+
+export interface ActivityOption {
+  id: string
+  destinationId: string
+  name: string
+  description: string
+  cost: number
+  category: ExpenseCategory
+  addedToSchedule: boolean
+}
+
+export interface Trip {
+  name: string
+  organization: string
+  startDate: string
+  endDate: string
+  totalBudget: number
+}
+
+export interface TripState {
+  trip: Trip
+  destinations: Destination[]
+  team: TeamMember[]
+  events: CalendarEvent[]
+  expenses: Expense[]
+  options: ActivityOption[]
+}
+
+export interface TripRecord extends TripState {
+  id: string
+  archived: boolean
+  createdAt: string
+}
