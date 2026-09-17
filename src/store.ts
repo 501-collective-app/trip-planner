@@ -9,6 +9,8 @@ import {
   eventToRow,
   expenseFromRow,
   expenseToRow,
+  flightDetailsFromRow,
+  flightDetailsToRow,
   memberFromRow,
   memberToRow,
   optionFromRow,
@@ -20,6 +22,7 @@ import {
   type DestinationRow,
   type EventRow,
   type ExpenseRow,
+  type FlightDetailsRow,
   type MemberRow,
   type OptionRow,
   type SensitiveRow,
@@ -30,6 +33,7 @@ import type {
   CalendarEvent,
   Destination,
   Expense,
+  FlightDetails,
   MemberSensitive,
   TeamMember,
   Trip,
@@ -91,6 +95,10 @@ interface Store {
   addEvent: (e: Omit<CalendarEvent, 'id'>) => void
   updateEvent: (id: string, patch: Partial<CalendarEvent>) => void
   removeEvent: (id: string) => void
+
+  updateFlightDetails: (eventId: string, patch: Partial<FlightDetails>) => void
+  setFlightSeat: (eventId: string, memberId: string, seat: string) => void
+  addFlight: (event: Omit<CalendarEvent, 'id' | 'category'>, flight: Omit<FlightDetails, 'eventId' | 'seats'>) => void
 
   addExpense: (e: Omit<Expense, 'id'>) => void
   removeExpense: (id: string) => void
@@ -229,15 +237,23 @@ export const useStore = create<Store>((set, get) => ({
       realtimeChannel = null
     }
 
-    const [{ data: members }, { data: destinations }, { data: events }, { data: expenses }, { data: options }, { data: sensitive }] =
-      await Promise.all([
-        supabase.from('trip_members').select('*').eq('trip_id', id),
-        supabase.from('destinations').select('*').eq('trip_id', id),
-        supabase.from('events').select('*').eq('trip_id', id),
-        supabase.from('expenses').select('*').eq('trip_id', id),
-        supabase.from('activity_options').select('*').eq('trip_id', id),
-        supabase.from('trip_member_sensitive').select('*').eq('trip_id', id),
-      ])
+    const [
+      { data: members },
+      { data: destinations },
+      { data: events },
+      { data: expenses },
+      { data: options },
+      { data: sensitive },
+      { data: flights },
+    ] = await Promise.all([
+      supabase.from('trip_members').select('*').eq('trip_id', id),
+      supabase.from('destinations').select('*').eq('trip_id', id),
+      supabase.from('events').select('*').eq('trip_id', id),
+      supabase.from('expenses').select('*').eq('trip_id', id),
+      supabase.from('activity_options').select('*').eq('trip_id', id),
+      supabase.from('trip_member_sensitive').select('*').eq('trip_id', id),
+      supabase.from('flight_details').select('*').eq('trip_id', id),
+    ])
 
     if (get().activeTripId !== id) return // switched again before this resolved
 
@@ -260,6 +276,9 @@ export const useStore = create<Store>((set, get) => ({
         options: (options as OptionRow[] | null)?.map(optionFromRow) ?? [],
         sensitiveByMember: Object.fromEntries(
           ((sensitive as SensitiveRow[] | null) ?? []).map((r) => [r.trip_member_id, sensitiveFromRow(r)]),
+        ),
+        flightsByEvent: Object.fromEntries(
+          ((flights as FlightDetailsRow[] | null) ?? []).map((r) => [r.event_id, flightDetailsFromRow(r)]),
         ),
       },
       loadingActiveTrip: false,
@@ -300,8 +319,27 @@ export const useStore = create<Store>((set, get) => ({
         else patchActive((t) => ({ ...t, destinations: upsertById(t.destinations, destinationFromRow(payload.new as DestinationRow)) }))
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `trip_id=eq.${id}` }, (payload) => {
-        if (payload.eventType === 'DELETE') patchActive((t) => ({ ...t, events: removeById(t.events, (payload.old as EventRow).id) }))
-        else patchActive((t) => ({ ...t, events: upsertById(t.events, eventFromRow(payload.new as EventRow)) }))
+        if (payload.eventType === 'DELETE') {
+          const removedId = (payload.old as EventRow).id
+          patchActive((t) => {
+            const nextFlights = { ...t.flightsByEvent }
+            delete nextFlights[removedId]
+            return { ...t, events: removeById(t.events, removedId), flightsByEvent: nextFlights }
+          })
+        } else patchActive((t) => ({ ...t, events: upsertById(t.events, eventFromRow(payload.new as EventRow)) }))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'flight_details', filter: `trip_id=eq.${id}` }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          const removedId = (payload.old as FlightDetailsRow).event_id
+          patchActive((t) => {
+            const next = { ...t.flightsByEvent }
+            delete next[removedId]
+            return { ...t, flightsByEvent: next }
+          })
+        } else {
+          const row = payload.new as FlightDetailsRow
+          patchActive((t) => ({ ...t, flightsByEvent: { ...t.flightsByEvent, [row.event_id]: flightDetailsFromRow(row) } }))
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `trip_id=eq.${id}` }, (payload) => {
         if (payload.eventType === 'DELETE') patchActive((t) => ({ ...t, expenses: removeById(t.expenses, (payload.old as ExpenseRow).id) }))
@@ -459,8 +497,53 @@ export const useStore = create<Store>((set, get) => ({
     supabase.from('events').update(eventToRow(patch)).eq('id', id)
   },
   removeEvent: (id) => {
-    set((s) => (s.activeTripData ? { activeTripData: { ...s.activeTripData, events: removeById(s.activeTripData.events, id) } } : {}))
+    set((s) => {
+      if (!s.activeTripData) return {}
+      const nextFlights = { ...s.activeTripData.flightsByEvent }
+      delete nextFlights[id]
+      return { activeTripData: { ...s.activeTripData, events: removeById(s.activeTripData.events, id), flightsByEvent: nextFlights } }
+    })
     supabase.from('events').delete().eq('id', id)
+  },
+
+  updateFlightDetails: (eventId, patch) => {
+    const tripId = get().activeTripId
+    if (!tripId) return
+    set((s) => {
+      if (!s.activeTripData) return {}
+      const prev: FlightDetails = s.activeTripData.flightsByEvent[eventId] ?? { eventId, seats: {} }
+      const merged: FlightDetails = { ...prev, ...patch }
+      return { activeTripData: { ...s.activeTripData, flightsByEvent: { ...s.activeTripData.flightsByEvent, [eventId]: merged } } }
+    })
+    supabase.from('flight_details').upsert({ event_id: eventId, trip_id: tripId, ...flightDetailsToRow(patch) }, { onConflict: 'event_id' })
+  },
+
+  setFlightSeat: (eventId, memberId, seat) => {
+    const tripId = get().activeTripId
+    if (!tripId) return
+    const current = get().activeTripData?.flightsByEvent[eventId]
+    const nextSeats = { ...(current?.seats ?? {}), [memberId]: seat }
+    get().updateFlightDetails(eventId, { seats: nextSeats })
+  },
+
+  addFlight: (event, flight) => {
+    const tripId = get().activeTripId
+    if (!tripId) return
+    const id = crypto.randomUUID()
+    const item: CalendarEvent = { ...event, id, category: 'Flights' }
+    set((s) =>
+      s.activeTripData
+        ? {
+            activeTripData: {
+              ...s.activeTripData,
+              events: [...s.activeTripData.events, item],
+              flightsByEvent: { ...s.activeTripData.flightsByEvent, [id]: { ...flight, eventId: id, seats: {} } },
+            },
+          }
+        : {},
+    )
+    supabase.from('events').insert({ id, trip_id: tripId, ...eventToRow(item) })
+    supabase.from('flight_details').insert({ event_id: id, trip_id: tripId, ...flightDetailsToRow(flight) })
   },
 
   addExpense: (e) => {
@@ -549,6 +632,7 @@ const EMPTY_TRIP: TripRecord = {
   expenses: [],
   options: [],
   sensitiveByMember: {},
+  flightsByEvent: {},
 }
 
 export function useActiveTrip(): TripRecord {

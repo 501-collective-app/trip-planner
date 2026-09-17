@@ -97,6 +97,7 @@ export function makeSampleTrip(id: string): TripRecord {
       { id: 'opt-kgl-coop', destinationId: 'dest-kigali', name: "Women's cooperative coffee tour", description: 'Farm-to-cup tour with a partner cooperative, good b-roll.', cost: 300, category: 'Activities', addedToSchedule: false },
     ],
     sensitiveByMember: {},
+    flightsByEvent: {},
   }
 }
 
@@ -121,5 +122,6 @@ export function makeBlankTrip(id: string, name = 'New Trip'): TripRecord {
     expenses: [],
     options: [],
     sensitiveByMember: {},
+    flightsByEvent: {},
   }
 }

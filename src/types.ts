@@ -86,6 +86,17 @@ export interface ActivityOption {
   addedToSchedule: boolean
 }
 
+export interface FlightDetails {
+  eventId: string
+  airline?: string
+  flightNumber?: string
+  departureAirport?: string // IATA code
+  arrivalAirport?: string
+  departureTime?: string // ISO datetime
+  arrivalTime?: string // ISO datetime
+  seats: Record<string, string> // TeamMember.id -> seat, e.g. "14C"
+}
+
 export interface Trip {
   name: string
   organization: string
@@ -102,6 +113,7 @@ export interface TripState {
   expenses: Expense[]
   options: ActivityOption[]
   sensitiveByMember: Record<string, MemberSensitive> // keyed by TeamMember.id
+  flightsByEvent: Record<string, FlightDetails> // keyed by CalendarEvent.id
 }
 
 export interface TripRecord extends TripState {

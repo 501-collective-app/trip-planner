@@ -4,6 +4,7 @@ import { BottomNav } from './components/BottomNav'
 import { TopBar } from './components/TopBar'
 import { BudgetBar } from './components/BudgetBar'
 import { CalendarView } from './pages/CalendarView'
+import { FlightsView } from './pages/FlightsView'
 import { BudgetView } from './pages/BudgetView'
 import { ActivitiesView } from './pages/ActivitiesView'
 import { TeamView } from './pages/TeamView'
@@ -11,6 +12,7 @@ import { SettingsView } from './pages/SettingsView'
 
 const TITLES: Record<Tab, string> = {
   calendar: 'Calendar',
+  flights: 'Flights',
   budget: 'Budget',
   activities: 'Activities',
   team: 'Team',
@@ -28,6 +30,7 @@ export default function App() {
         {(tab === 'calendar' || tab === 'budget') && <BudgetBar />}
         <div className="flex-1 pb-20 md:pb-0">
           {tab === 'calendar' && <CalendarView />}
+          {tab === 'flights' && <FlightsView />}
           {tab === 'budget' && <BudgetView />}
           {tab === 'activities' && <ActivitiesView />}
           {tab === 'team' && <TeamView />}

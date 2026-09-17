@@ -1,21 +1,17 @@
 import { useMemo, useState } from 'react'
+import { Plane } from 'lucide-react'
 import { useActiveTrip } from '../store'
-import { destinationForDate, money } from '../lib/derive'
-import { tripRangeWeeks, todayIso } from '../lib/date'
+import { destinationForDate, money, tripDateRange } from '../lib/derive'
+import { todayIso } from '../lib/date'
 import { WeatherChip } from '../components/WeatherChip'
 import { DayDetailModal } from '../components/DayDetailModal'
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export function CalendarView() {
   const active = useActiveTrip()
   const today = todayIso()
   const [openDate, setOpenDate] = useState<string | null>(null)
 
-  const weeks = useMemo(
-    () => tripRangeWeeks(active.trip.startDate, active.trip.endDate),
-    [active.trip.startDate, active.trip.endDate],
-  )
+  const dates = useMemo(() => tripDateRange(active), [active.trip.startDate, active.trip.endDate])
 
   const rangeLabel = useMemo(() => {
     const start = new Date(active.trip.startDate + 'T00:00:00')
@@ -33,26 +29,10 @@ export function CalendarView() {
           <h2 className="text-base font-semibold text-stone-900 md:text-lg">{rangeLabel}</h2>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-stone-200 bg-stone-200">
-          <div className="grid grid-cols-7 bg-white">
-            {WEEKDAYS.map((w) => (
-              <div key={w} className="py-2 text-center text-[10px] font-semibold uppercase tracking-wide text-stone-400 md:text-xs">
-                {w}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-px">
-            {weeks.map((week) =>
-              week.map((date) => {
-                const inTrip = date >= active.trip.startDate && date <= active.trip.endDate
-                return inTrip ? (
-                  <DayCell key={date} date={date} isToday={date === today} onOpen={() => setOpenDate(date)} />
-                ) : (
-                  <div key={date} className="bg-stone-50" />
-                )
-              }),
-            )}
-          </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          {dates.map((date) => (
+            <DayCell key={date} date={date} isToday={date === today} onOpen={() => setOpenDate(date)} />
+          ))}
         </div>
       </div>
 
@@ -65,21 +45,23 @@ function DayCell({ date, isToday, onOpen }: { date: string; isToday: boolean; on
   const active = useActiveTrip()
   const destination = destinationForDate(active.destinations, date)
   const dayEvents = active.events.filter((e) => e.date === date).sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
+  const hasFlight = dayEvents.some((e) => e.category === 'Flights')
   const dayNum = Number(date.slice(8, 10))
+  const weekday = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' })
 
   return (
     <button
       onClick={onOpen}
-      className="flex min-h-[120px] flex-col items-stretch gap-1.5 bg-brand-mint/5 p-2 text-left align-top hover:bg-brand-mint/10 sm:min-h-[150px] md:p-3"
+      className={`flex min-h-[160px] flex-col items-stretch gap-1.5 rounded-xl border bg-white p-3 text-left shadow-sm hover:border-brand-mint-dark hover:shadow-md sm:min-h-[180px] ${
+        isToday ? 'border-brand-dark' : 'border-stone-200'
+      }`}
     >
       <div className="flex items-center justify-between">
-        <span
-          className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium md:h-7 md:w-7 md:text-sm ${
-            isToday ? 'bg-brand-dark text-white' : 'text-stone-700'
-          }`}
-        >
-          {dayNum}
-        </span>
+        <div className="flex items-baseline gap-1.5">
+          <span className={`text-lg font-semibold ${isToday ? 'text-brand-dark' : 'text-stone-800'}`}>{dayNum}</span>
+          <span className="text-[11px] font-medium uppercase tracking-wide text-stone-400">{weekday}</span>
+          {hasFlight && <Plane size={13} className="shrink-0 rotate-45 text-brand-mint-dark" />}
+        </div>
         {destination && <WeatherChip destination={destination} date={date} compact />}
       </div>
 
@@ -87,7 +69,7 @@ function DayCell({ date, isToday, onOpen }: { date: string; isToday: boolean; on
 
       <div className="flex-1 space-y-1 overflow-hidden">
         {dayEvents.slice(0, 4).map((ev) => (
-          <div key={ev.id} className="truncate rounded bg-brand-dark/5 px-1.5 py-1 text-xs font-medium text-stone-700">
+          <div key={ev.id} className="truncate rounded bg-stone-50 px-1.5 py-1 text-xs font-medium text-stone-700">
             {ev.time && <span className="text-stone-400">{ev.time.slice(0, 5)} </span>}
             {ev.title}
           </div>

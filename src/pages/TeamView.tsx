@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Plus, Trash2, Mail, Camera, ShieldCheck, Users as UsersIcon } from 'lucide-react'
+import { Plus, Trash2, Mail, Camera, ShieldCheck, Users as UsersIcon, Plane } from 'lucide-react'
 import { useStore, useActiveTrip } from '../store'
 import { Modal } from '../components/Modal'
 import type { MemberType, TeamMember } from '../types'
@@ -202,6 +202,45 @@ function MemberTypeToggle({ value, onChange, disabled }: { value: MemberType; on
   )
 }
 
+function MemberFlightsSection({ memberId }: { memberId: string }) {
+  const active = useActiveTrip()
+  const setFlightSeat = useStore((s) => s.setFlightSeat)
+  const flights = active.events
+    .filter((e) => e.category === 'Flights' && e.attendeeIds.includes(memberId))
+    .sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))
+
+  if (flights.length === 0) return null
+
+  return (
+    <div className="border-t border-stone-100 pt-4">
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-stone-400">
+        <Plane size={13} />
+        Flights &amp; seats
+      </div>
+      <div className="space-y-2">
+        {flights.map((ev) => {
+          const flight = active.flightsByEvent[ev.id]
+          const label = flight?.airline ? `${flight.airline} ${flight.flightNumber ?? ''}`.trim() : ev.title
+          return (
+            <div key={ev.id} className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm text-stone-700">{label}</div>
+                <div className="text-xs text-stone-400">{ev.date}</div>
+              </div>
+              <input
+                className="input w-24 text-center"
+                defaultValue={flight?.seats[memberId] ?? ''}
+                placeholder="Seat"
+                onBlur={(e) => setFlightSeat(ev.id, memberId, e.target.value.toUpperCase())}
+              />
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function MemberDetailModal({ memberId, isLeader, onClose }: { memberId: string; isLeader: boolean; onClose: () => void }) {
   const active = useActiveTrip()
   const member = active.team.find((m) => m.id === memberId)
@@ -256,6 +295,8 @@ function MemberDetailModal({ memberId, isLeader, onClose }: { memberId: string; 
             onChange={(v) => updateTeamMember(memberId, { memberType: v })}
           />
         </div>
+
+        <MemberFlightsSection memberId={memberId} />
 
         <div className="border-t border-stone-100 pt-4">
           {isLeader ? (

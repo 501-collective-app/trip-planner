@@ -1,10 +1,11 @@
-import { CalendarDays, Wallet, ListChecks, Users, Settings } from 'lucide-react'
+import { CalendarDays, Wallet, ListChecks, Users, Settings, Plane } from 'lucide-react'
 import { BrandMark } from './BrandMark'
 
-export type Tab = 'calendar' | 'budget' | 'activities' | 'team' | 'settings'
+export type Tab = 'calendar' | 'flights' | 'budget' | 'activities' | 'team' | 'settings'
 
 export const NAV: { id: Tab; label: string; icon: typeof CalendarDays }[] = [
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
+  { id: 'flights', label: 'Flights', icon: Plane },
   { id: 'budget', label: 'Budget', icon: Wallet },
   { id: 'activities', label: 'Activities', icon: ListChecks },
   { id: 'team', label: 'Team', icon: Users },
@@ -33,9 +34,7 @@ export function Sidebar({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
         ))}
       </nav>
 
-      <div className="border-t border-white/10 p-4 text-xs text-white/30">
-        Prototype &middot; data stored locally in this browser
-      </div>
+      <div className="border-t border-white/10 p-4 text-xs text-white/30">Synced across your team, live</div>
     </aside>
   )
 }

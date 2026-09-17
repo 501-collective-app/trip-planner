@@ -1,4 +1,4 @@
-import type { ActivityOption, CalendarEvent, Destination, Expense, MemberSensitive, TeamMember, Trip } from '../types'
+import type { ActivityOption, CalendarEvent, Destination, Expense, FlightDetails, MemberSensitive, TeamMember, Trip } from '../types'
 
 // Supabase rows are snake_case; the app's types are camelCase. These convert both ways.
 
@@ -184,6 +184,41 @@ export function expenseToRow(e: Partial<Expense>) {
   if (e.paidBy !== undefined) row.paid_by = e.paidBy
   if (e.receiptPath !== undefined) row.receipt_path = e.receiptPath
   if (e.receiptUrl !== undefined) row.receipt_url = e.receiptUrl
+  return row
+}
+
+export interface FlightDetailsRow {
+  event_id: string
+  trip_id: string
+  airline: string | null
+  flight_number: string | null
+  departure_airport: string | null
+  arrival_airport: string | null
+  departure_time: string | null
+  arrival_time: string | null
+  seats: Record<string, string>
+}
+export function flightDetailsFromRow(r: FlightDetailsRow): FlightDetails {
+  return {
+    eventId: r.event_id,
+    airline: r.airline ?? undefined,
+    flightNumber: r.flight_number ?? undefined,
+    departureAirport: r.departure_airport ?? undefined,
+    arrivalAirport: r.arrival_airport ?? undefined,
+    departureTime: r.departure_time ?? undefined,
+    arrivalTime: r.arrival_time ?? undefined,
+    seats: r.seats ?? {},
+  }
+}
+export function flightDetailsToRow(f: Partial<FlightDetails>) {
+  const row: Record<string, unknown> = {}
+  if (f.airline !== undefined) row.airline = f.airline
+  if (f.flightNumber !== undefined) row.flight_number = f.flightNumber
+  if (f.departureAirport !== undefined) row.departure_airport = f.departureAirport
+  if (f.arrivalAirport !== undefined) row.arrival_airport = f.arrivalAirport
+  if (f.departureTime !== undefined) row.departure_time = f.departureTime
+  if (f.arrivalTime !== undefined) row.arrival_time = f.arrivalTime
+  if (f.seats !== undefined) row.seats = f.seats
   return row
 }
 
