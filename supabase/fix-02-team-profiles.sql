@@ -1,6 +1,7 @@
 -- Adds trip_leader / team_member tagging and a sensitive-info table (legal name,
 -- emergency contact, passport photo) that's only readable by trip leaders —
 -- enforced by RLS, not just hidden in the UI. Run after schema.sql + fix-01.
+-- Safe to re-run: every statement is idempotent.
 
 alter table trip_members add column if not exists member_type text not null default 'team_member'
   check (member_type in ('trip_leader', 'team_member'));
@@ -66,12 +67,21 @@ create table if not exists trip_member_sensitive (
 
 alter table trip_member_sensitive enable row level security;
 
+drop policy if exists "sensitive: leaders can read" on trip_member_sensitive;
 create policy "sensitive: leaders can read" on trip_member_sensitive for select using (is_trip_leader(trip_id));
+drop policy if exists "sensitive: leaders can write" on trip_member_sensitive;
 create policy "sensitive: leaders can write" on trip_member_sensitive for insert with check (is_trip_leader(trip_id));
+drop policy if exists "sensitive: leaders can update" on trip_member_sensitive;
 create policy "sensitive: leaders can update" on trip_member_sensitive for update using (is_trip_leader(trip_id));
+drop policy if exists "sensitive: leaders can delete" on trip_member_sensitive;
 create policy "sensitive: leaders can delete" on trip_member_sensitive for delete using (is_trip_leader(trip_id));
 
-alter publication supabase_realtime add table trip_member_sensitive;
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'trip_member_sensitive') then
+    alter publication supabase_realtime add table trip_member_sensitive;
+  end if;
+end $$;
 
 -- ---------- Passport photo storage (private bucket) ----------
 
@@ -95,6 +105,13 @@ drop policy if exists "passport photos: leaders can delete" on storage.objects;
 create policy "passport photos: leaders can delete" on storage.objects for delete
   using (bucket_id = 'passport-photos' and is_trip_leader((storage.foldername(name))[1]::uuid));
 
--- Make the trip creator a trip_leader (everyone seeded before this migration defaulted to team_member).
+-- Make each trip's creator a trip_leader. This bypasses the anti-escalation
+-- trigger deliberately: it's a one-time administrative bootstrap, not a user
+-- action, and there's no logged-in user for is_trip_leader() to check against
+-- here anyway.
+alter table trip_members disable trigger trip_members_prevent_self_promotion;
+
 update trip_members set member_type = 'trip_leader'
 where id in (select tm.id from trip_members tm join trips t on t.id = tm.trip_id where t.created_by = tm.user_id);
+
+alter table trip_members enable trigger trip_members_prevent_self_promotion;
