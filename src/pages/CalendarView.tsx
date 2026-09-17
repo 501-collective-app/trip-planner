@@ -24,12 +24,12 @@ export function CalendarView() {
 
   return (
     <div className="px-3 py-4 md:px-6 md:py-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-[1600px]">
         <div className="mb-3">
           <h2 className="text-base font-semibold text-stone-900 md:text-lg">{rangeLabel}</h2>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
           {dates.map((date) => (
             <DayCell key={date} date={date} isToday={date === today} onOpen={() => setOpenDate(date)} />
           ))}
@@ -52,7 +52,7 @@ function DayCell({ date, isToday, onOpen }: { date: string; isToday: boolean; on
   return (
     <button
       onClick={onOpen}
-      className={`flex min-h-[160px] flex-col items-stretch gap-1.5 rounded-xl border bg-white p-3 text-left shadow-sm hover:border-brand-mint-dark hover:shadow-md sm:min-h-[180px] ${
+      className={`flex min-h-[180px] flex-col items-stretch gap-1.5 rounded-xl border bg-white p-4 text-left shadow-sm hover:border-brand-mint-dark hover:shadow-md sm:min-h-[220px] ${
         isToday ? 'border-brand-dark' : 'border-stone-200'
       }`}
     >

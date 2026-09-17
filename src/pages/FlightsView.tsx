@@ -1,9 +1,76 @@
-import { useState } from 'react'
-import { Plane, Plus, Trash2, RadioTower } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plane, Plus, Trash2, RadioTower, RotateCw } from 'lucide-react'
 import { useStore, useActiveTrip } from '../store'
 import { Modal } from '../components/Modal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { fetchFlightStatus, type FlightStatus } from '../lib/flightStatus'
 import type { CalendarEvent } from '../types'
+
+function fmtUtc(iso: string | null) {
+  if (!iso) return null
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+function LiveStatus({ flightNumber, date }: { flightNumber?: string; date: string }) {
+  const [status, setStatus] = useState<FlightStatus | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  async function load() {
+    if (!flightNumber) return
+    setLoading(true)
+    setError(null)
+    const { data, error } = await fetchFlightStatus(flightNumber, date)
+    setStatus(data)
+    setError(error)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flightNumber, date])
+
+  if (!flightNumber) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-xs text-stone-400">
+        <RadioTower size={13} />
+        Add a flight number to get live status.
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-stone-200 px-3 py-2.5">
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-stone-400">
+          <RadioTower size={13} />
+          Live status
+        </span>
+        <button onClick={load} disabled={loading} className="text-stone-400 hover:text-brand-mint-dark disabled:opacity-40">
+          <RotateCw size={13} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+      {loading && !status && <p className="text-xs text-stone-400">Checking&hellip;</p>}
+      {error && <p className="text-xs text-red-500">{error === 'Not configured' ? 'Flight status API not set up yet.' : error}</p>}
+      {status && (
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <div className="font-medium text-stone-700">{status.status ?? 'Unknown'}</div>
+            <div className="text-stone-400">Status</div>
+          </div>
+          <div>
+            <div className="font-medium text-stone-700">
+              {status.departure.gate ? `Gate ${status.departure.gate}` : '—'}
+              {status.departure.terminal ? ` (T${status.departure.terminal})` : ''}
+            </div>
+            <div className="text-stone-400">{fmtUtc(status.departure.revisedTime ?? status.departure.scheduledTime) ?? 'Departure'}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function fmtDateTime(iso?: string) {
   if (!iso) return null
@@ -253,11 +320,7 @@ function FlightDetailModal({ eventId, onClose }: { eventId: string; onClose: () 
           {flight?.arrivalTime && <> &rarr; {fmtDateTime(flight.arrivalTime)}</>}
         </div>
 
-        <div className="flex items-center gap-2 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-xs text-stone-400">
-          <RadioTower size={13} />
-          Live flight status isn't connected yet.
-        </div>
-
+        <LiveStatus flightNumber={flight?.flightNumber} date={event.date} />
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-stone-500">Airline</span>

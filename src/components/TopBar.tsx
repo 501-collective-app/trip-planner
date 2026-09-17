@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { useActiveTrip } from '../store'
 import { BrandMark } from './BrandMark'
 import { TripSwitcherModal } from './TripSwitcherModal'
+import { ClockRow } from './ClockRow'
 
 export function TopBar({ title }: { title: string }) {
   const trip = useActiveTrip()
@@ -30,6 +31,9 @@ export function TopBar({ title }: { title: string }) {
         </button>
       </div>
       <h1 className="mt-1 text-lg font-semibold text-stone-900 md:hidden">{title}</h1>
+      <div className="mt-1.5">
+        <ClockRow />
+      </div>
 
       {switching && <TripSwitcherModal onClose={() => setSwitching(false)} />}
     </header>

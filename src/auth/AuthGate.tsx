@@ -45,7 +45,7 @@ function LoadingScreen() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-brand-dark">
       <div className="animate-pulse">
-        <BrandMark />
+        <BrandMark size="huge" />
       </div>
     </div>
   )
