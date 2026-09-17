@@ -97,6 +97,8 @@ export function SettingsView() {
         </button>
       </section>
 
+      <AccountSection />
+
       {addingDest && <AddDestination onClose={() => setAddingDest(false)} />}
       {confirmReset && (
         <ConfirmDialog
@@ -112,6 +114,24 @@ export function SettingsView() {
         />
       )}
     </div>
+  )
+}
+
+function AccountSection() {
+  const email = useStore((s) => s.session?.user.email)
+  const signOut = useStore((s) => s.signOut)
+
+  return (
+    <section className="rounded-xl border border-stone-200 bg-white p-4 md:p-5">
+      <h3 className="mb-1 text-sm font-semibold text-stone-900">Account</h3>
+      <p className="mb-3 text-xs text-stone-500">Signed in as {email}</p>
+      <button
+        onClick={() => signOut()}
+        className="rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100"
+      >
+        Sign out
+      </button>
+    </section>
   )
 }
 

@@ -16,7 +16,7 @@ export function TopBar({ title }: { title: string }) {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 md:hidden">
           <div className="scale-75 origin-left">
-            <BrandMark size="sm" />
+            <BrandMark size="sm" on="light" />
           </div>
         </div>
         <h1 className="hidden text-xl font-semibold text-stone-900 md:block">{title}</h1>

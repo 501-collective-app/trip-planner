@@ -1,0 +1,196 @@
+import type { ActivityOption, CalendarEvent, Destination, Expense, TeamMember, Trip } from '../types'
+
+// Supabase rows are snake_case; the app's types are camelCase. These convert both ways.
+
+export interface TripRow {
+  id: string
+  name: string
+  organization: string
+  start_date: string
+  end_date: string
+  total_budget: number
+  archived: boolean
+  created_by: string | null
+  created_at: string
+}
+export function tripFromRow(r: TripRow): Trip {
+  return { name: r.name, organization: r.organization, startDate: r.start_date, endDate: r.end_date, totalBudget: r.total_budget }
+}
+export function tripToRow(t: Partial<Trip>) {
+  const row: Record<string, unknown> = {}
+  if (t.name !== undefined) row.name = t.name
+  if (t.organization !== undefined) row.organization = t.organization
+  if (t.startDate !== undefined) row.start_date = t.startDate
+  if (t.endDate !== undefined) row.end_date = t.endDate
+  if (t.totalBudget !== undefined) row.total_budget = t.totalBudget
+  return row
+}
+
+export interface MemberRow {
+  id: string
+  trip_id: string
+  user_id: string | null
+  email: string
+  name: string
+  role: string
+  color: string
+  status: 'confirmed' | 'invited'
+}
+export function memberFromRow(r: MemberRow): TeamMember {
+  return { id: r.id, name: r.name, role: r.role, email: r.email, color: r.color, status: r.status }
+}
+export function memberToRow(m: Partial<TeamMember>) {
+  const row: Record<string, unknown> = {}
+  if (m.name !== undefined) row.name = m.name
+  if (m.role !== undefined) row.role = m.role
+  if (m.email !== undefined) row.email = m.email
+  if (m.color !== undefined) row.color = m.color
+  if (m.status !== undefined) row.status = m.status
+  return row
+}
+
+export interface DestinationRow {
+  id: string
+  trip_id: string
+  city: string
+  country: string
+  lat: number
+  lon: number
+  arrive: string
+  depart: string
+  notes: string | null
+}
+export function destinationFromRow(r: DestinationRow): Destination {
+  return { id: r.id, city: r.city, country: r.country, lat: r.lat, lon: r.lon, arrive: r.arrive, depart: r.depart, notes: r.notes ?? undefined }
+}
+export function destinationToRow(d: Partial<Destination>) {
+  const row: Record<string, unknown> = {}
+  if (d.city !== undefined) row.city = d.city
+  if (d.country !== undefined) row.country = d.country
+  if (d.lat !== undefined) row.lat = d.lat
+  if (d.lon !== undefined) row.lon = d.lon
+  if (d.arrive !== undefined) row.arrive = d.arrive
+  if (d.depart !== undefined) row.depart = d.depart
+  if (d.notes !== undefined) row.notes = d.notes
+  return row
+}
+
+export interface EventRow {
+  id: string
+  trip_id: string
+  date: string
+  time: string | null
+  title: string
+  destination_id: string
+  category: string
+  cost: number | null
+  attendee_ids: string[]
+  notes: string | null
+  from_option_id: string | null
+}
+export function eventFromRow(r: EventRow): CalendarEvent {
+  return {
+    id: r.id,
+    date: r.date,
+    time: r.time ?? undefined,
+    title: r.title,
+    destinationId: r.destination_id,
+    category: r.category as CalendarEvent['category'],
+    cost: r.cost ?? undefined,
+    attendeeIds: r.attendee_ids ?? [],
+    notes: r.notes ?? undefined,
+    fromOptionId: r.from_option_id ?? undefined,
+  }
+}
+export function eventToRow(e: Partial<CalendarEvent>) {
+  const row: Record<string, unknown> = {}
+  if (e.date !== undefined) row.date = e.date
+  if (e.time !== undefined) row.time = e.time
+  if (e.title !== undefined) row.title = e.title
+  if (e.destinationId !== undefined) row.destination_id = e.destinationId
+  if (e.category !== undefined) row.category = e.category
+  if (e.cost !== undefined) row.cost = e.cost
+  if (e.attendeeIds !== undefined) row.attendee_ids = e.attendeeIds
+  if (e.notes !== undefined) row.notes = e.notes
+  if (e.fromOptionId !== undefined) row.from_option_id = e.fromOptionId
+  return row
+}
+
+export interface ExpenseRow {
+  id: string
+  trip_id: string
+  date: string
+  amount: number
+  currency: string
+  original_amount: number
+  fx_rate_to_usd: number
+  category: string
+  description: string
+  destination_id: string | null
+  paid_by: string | null
+  receipt_path: string | null
+  receipt_url: string | null
+}
+export function expenseFromRow(r: ExpenseRow): Expense {
+  return {
+    id: r.id,
+    date: r.date,
+    amount: r.amount,
+    currency: r.currency,
+    originalAmount: r.original_amount,
+    fxRateToUsd: r.fx_rate_to_usd,
+    category: r.category as Expense['category'],
+    description: r.description,
+    destinationId: r.destination_id ?? undefined,
+    paidBy: r.paid_by ?? undefined,
+    receiptPath: r.receipt_path ?? undefined,
+    receiptUrl: r.receipt_url ?? undefined,
+  }
+}
+export function expenseToRow(e: Partial<Expense>) {
+  const row: Record<string, unknown> = {}
+  if (e.date !== undefined) row.date = e.date
+  if (e.amount !== undefined) row.amount = e.amount
+  if (e.currency !== undefined) row.currency = e.currency
+  if (e.originalAmount !== undefined) row.original_amount = e.originalAmount
+  if (e.fxRateToUsd !== undefined) row.fx_rate_to_usd = e.fxRateToUsd
+  if (e.category !== undefined) row.category = e.category
+  if (e.description !== undefined) row.description = e.description
+  if (e.destinationId !== undefined) row.destination_id = e.destinationId
+  if (e.paidBy !== undefined) row.paid_by = e.paidBy
+  if (e.receiptPath !== undefined) row.receipt_path = e.receiptPath
+  if (e.receiptUrl !== undefined) row.receipt_url = e.receiptUrl
+  return row
+}
+
+export interface OptionRow {
+  id: string
+  trip_id: string
+  destination_id: string
+  name: string
+  description: string | null
+  cost: number
+  category: string
+  added_to_schedule: boolean
+}
+export function optionFromRow(r: OptionRow): ActivityOption {
+  return {
+    id: r.id,
+    destinationId: r.destination_id,
+    name: r.name,
+    description: r.description ?? '',
+    cost: r.cost,
+    category: r.category as ActivityOption['category'],
+    addedToSchedule: r.added_to_schedule,
+  }
+}
+export function optionToRow(o: Partial<ActivityOption>) {
+  const row: Record<string, unknown> = {}
+  if (o.destinationId !== undefined) row.destination_id = o.destinationId
+  if (o.name !== undefined) row.name = o.name
+  if (o.description !== undefined) row.description = o.description
+  if (o.cost !== undefined) row.cost = o.cost
+  if (o.category !== undefined) row.category = o.category
+  if (o.addedToSchedule !== undefined) row.added_to_schedule = o.addedToSchedule
+  return row
+}

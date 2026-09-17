@@ -103,7 +103,8 @@ function InviteForm({ onClose }: { onClose: () => void }) {
           <input className="input" value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Logistics" />
         </label>
         <p className="text-xs text-stone-400">
-          This prototype doesn't send real invite emails yet, it just adds them to the team list.
+          They'll get full access to this trip the next time they sign in with this exact email. This doesn't email them
+          automatically, let them know yourself for now.
         </p>
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100">
