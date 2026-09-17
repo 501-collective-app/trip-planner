@@ -53,11 +53,11 @@ export function makeSampleTrip(id: string): TripRecord {
       },
     ],
     team: [
-      { id: 'tm-tom', name: 'Tom Baker', role: 'Trip Lead', email: 'tom@tombaker.co', color: '#81e0ae', status: 'confirmed' },
-      { id: 'tm-2', name: 'Maya Ortiz', role: 'Program Director', email: 'maya@example.org', color: '#ffc800', status: 'confirmed' },
-      { id: 'tm-3', name: 'Jonah Reyes', role: 'Videographer', email: 'jonah@example.org', color: '#2563eb', status: 'confirmed' },
-      { id: 'tm-4', name: 'Priya Nair', role: 'Finance Lead', email: 'priya@example.org', color: '#ea580c', status: 'invited' },
-      { id: 'tm-5', name: 'Sam Whitfield', role: 'Logistics', email: 'sam@example.org', color: '#dc2626', status: 'invited' },
+      { id: 'tm-tom', name: 'Tom Baker', role: 'Trip Lead', email: 'tom@tombaker.co', color: '#81e0ae', status: 'confirmed', memberType: 'trip_leader' },
+      { id: 'tm-2', name: 'Maya Ortiz', role: 'Program Director', email: 'maya@example.org', color: '#ffc800', status: 'confirmed', memberType: 'trip_leader' },
+      { id: 'tm-3', name: 'Jonah Reyes', role: 'Videographer', email: 'jonah@example.org', color: '#2563eb', status: 'confirmed', memberType: 'team_member' },
+      { id: 'tm-4', name: 'Priya Nair', role: 'Finance Lead', email: 'priya@example.org', color: '#ea580c', status: 'invited', memberType: 'team_member' },
+      { id: 'tm-5', name: 'Sam Whitfield', role: 'Logistics', email: 'sam@example.org', color: '#dc2626', status: 'invited', memberType: 'team_member' },
     ],
     events: [
       { id: 'ev-1', date: '2026-09-21', time: '09:00', title: 'Team flights depart', destinationId: 'dest-nairobi', category: 'Flights', cost: 14200, attendeeIds: ['tm-tom', 'tm-2', 'tm-3', 'tm-4', 'tm-5'], notes: 'Meet at gate 2 hours early, group booking reference in email.' },
@@ -96,6 +96,7 @@ export function makeSampleTrip(id: string): TripRecord {
       { id: 'opt-kgl-memorial', destinationId: 'dest-kigali', name: 'Kigali Genocide Memorial', description: 'Essential context visit, allow a quiet afternoon after.', cost: 120, category: 'Activities', addedToSchedule: true },
       { id: 'opt-kgl-coop', destinationId: 'dest-kigali', name: "Women's cooperative coffee tour", description: 'Farm-to-cup tour with a partner cooperative, good b-roll.', cost: 300, category: 'Activities', addedToSchedule: false },
     ],
+    sensitiveByMember: {},
   }
 }
 
@@ -119,5 +120,6 @@ export function makeBlankTrip(id: string, name = 'New Trip'): TripRecord {
     events: [],
     expenses: [],
     options: [],
+    sensitiveByMember: {},
   }
 }

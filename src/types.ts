@@ -28,6 +28,8 @@ export interface Destination {
   notes?: string
 }
 
+export type MemberType = 'trip_leader' | 'team_member'
+
 export interface TeamMember {
   id: string
   name: string
@@ -35,6 +37,15 @@ export interface TeamMember {
   email: string
   color: string
   status: 'confirmed' | 'invited'
+  memberType: MemberType
+}
+
+// Only present for members you're allowed to see (trip leaders see everyone's;
+// everyone else sees none, enforced server-side by RLS, not just hidden in the UI).
+export interface MemberSensitive {
+  legalName?: string
+  emergencyContact?: string
+  passportPhotoPath?: string
 }
 
 export interface CalendarEvent {
@@ -90,6 +101,7 @@ export interface TripState {
   events: CalendarEvent[]
   expenses: Expense[]
   options: ActivityOption[]
+  sensitiveByMember: Record<string, MemberSensitive> // keyed by TeamMember.id
 }
 
 export interface TripRecord extends TripState {

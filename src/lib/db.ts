@@ -1,4 +1,4 @@
-import type { ActivityOption, CalendarEvent, Destination, Expense, TeamMember, Trip } from '../types'
+import type { ActivityOption, CalendarEvent, Destination, Expense, MemberSensitive, TeamMember, Trip } from '../types'
 
 // Supabase rows are snake_case; the app's types are camelCase. These convert both ways.
 
@@ -35,9 +35,10 @@ export interface MemberRow {
   role: string
   color: string
   status: 'confirmed' | 'invited'
+  member_type: 'trip_leader' | 'team_member'
 }
 export function memberFromRow(r: MemberRow): TeamMember {
-  return { id: r.id, name: r.name, role: r.role, email: r.email, color: r.color, status: r.status }
+  return { id: r.id, name: r.name, role: r.role, email: r.email, color: r.color, status: r.status, memberType: r.member_type }
 }
 export function memberToRow(m: Partial<TeamMember>) {
   const row: Record<string, unknown> = {}
@@ -46,6 +47,29 @@ export function memberToRow(m: Partial<TeamMember>) {
   if (m.email !== undefined) row.email = m.email
   if (m.color !== undefined) row.color = m.color
   if (m.status !== undefined) row.status = m.status
+  if (m.memberType !== undefined) row.member_type = m.memberType
+  return row
+}
+
+export interface SensitiveRow {
+  trip_member_id: string
+  trip_id: string
+  legal_name: string | null
+  emergency_contact: string | null
+  passport_photo_path: string | null
+}
+export function sensitiveFromRow(r: SensitiveRow): MemberSensitive {
+  return {
+    legalName: r.legal_name ?? undefined,
+    emergencyContact: r.emergency_contact ?? undefined,
+    passportPhotoPath: r.passport_photo_path ?? undefined,
+  }
+}
+export function sensitiveToRow(s: Partial<MemberSensitive>) {
+  const row: Record<string, unknown> = {}
+  if (s.legalName !== undefined) row.legal_name = s.legalName
+  if (s.emergencyContact !== undefined) row.emergency_contact = s.emergencyContact
+  if (s.passportPhotoPath !== undefined) row.passport_photo_path = s.passportPhotoPath
   return row
 }
 

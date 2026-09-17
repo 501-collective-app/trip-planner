@@ -13,6 +13,8 @@ import {
   memberToRow,
   optionFromRow,
   optionToRow,
+  sensitiveFromRow,
+  sensitiveToRow,
   tripFromRow,
   tripToRow,
   type DestinationRow,
@@ -20,6 +22,7 @@ import {
   type ExpenseRow,
   type MemberRow,
   type OptionRow,
+  type SensitiveRow,
   type TripRow,
 } from './lib/db'
 import type {
@@ -27,6 +30,7 @@ import type {
   CalendarEvent,
   Destination,
   Expense,
+  MemberSensitive,
   TeamMember,
   Trip,
   TripRecord,
@@ -80,6 +84,9 @@ interface Store {
   addTeamMember: (m: Omit<TeamMember, 'id'>) => void
   updateTeamMember: (id: string, patch: Partial<TeamMember>) => void
   removeTeamMember: (id: string) => void
+  updateMemberSensitive: (memberId: string, patch: Partial<MemberSensitive>) => void
+  uploadPassportPhoto: (memberId: string, file: File) => Promise<void>
+  getPassportPhotoUrl: (path: string) => Promise<string | null>
 
   addEvent: (e: Omit<CalendarEvent, 'id'>) => void
   updateEvent: (id: string, patch: Partial<CalendarEvent>) => void
@@ -102,7 +109,7 @@ async function ensureSelfMembership(tripId: string, userId: string, email: strin
   if (existing) {
     await supabase.from('trip_members').update({ user_id: userId, status: 'confirmed' }).eq('id', existing.id)
   } else {
-    await supabase.from('trip_members').insert({ id: crypto.randomUUID(), trip_id: tripId, user_id: userId, email, name, role: 'Trip Lead', color: '#81e0ae', status: 'confirmed' })
+    await supabase.from('trip_members').insert({ id: crypto.randomUUID(), trip_id: tripId, user_id: userId, email, name, role: 'Trip Lead', color: '#81e0ae', status: 'confirmed', member_type: 'trip_leader' })
   }
 }
 
@@ -222,13 +229,15 @@ export const useStore = create<Store>((set, get) => ({
       realtimeChannel = null
     }
 
-    const [{ data: members }, { data: destinations }, { data: events }, { data: expenses }, { data: options }] = await Promise.all([
-      supabase.from('trip_members').select('*').eq('trip_id', id),
-      supabase.from('destinations').select('*').eq('trip_id', id),
-      supabase.from('events').select('*').eq('trip_id', id),
-      supabase.from('expenses').select('*').eq('trip_id', id),
-      supabase.from('activity_options').select('*').eq('trip_id', id),
-    ])
+    const [{ data: members }, { data: destinations }, { data: events }, { data: expenses }, { data: options }, { data: sensitive }] =
+      await Promise.all([
+        supabase.from('trip_members').select('*').eq('trip_id', id),
+        supabase.from('destinations').select('*').eq('trip_id', id),
+        supabase.from('events').select('*').eq('trip_id', id),
+        supabase.from('expenses').select('*').eq('trip_id', id),
+        supabase.from('activity_options').select('*').eq('trip_id', id),
+        supabase.from('trip_member_sensitive').select('*').eq('trip_id', id),
+      ])
 
     if (get().activeTripId !== id) return // switched again before this resolved
 
@@ -249,6 +258,9 @@ export const useStore = create<Store>((set, get) => ({
         events: (events as EventRow[] | null)?.map(eventFromRow) ?? [],
         expenses: (expenses as ExpenseRow[] | null)?.map(expenseFromRow) ?? [],
         options: (options as OptionRow[] | null)?.map(optionFromRow) ?? [],
+        sensitiveByMember: Object.fromEntries(
+          ((sensitive as SensitiveRow[] | null) ?? []).map((r) => [r.trip_member_id, sensitiveFromRow(r)]),
+        ),
       },
       loadingActiveTrip: false,
     })
@@ -268,6 +280,19 @@ export const useStore = create<Store>((set, get) => ({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_members', filter: `trip_id=eq.${id}` }, (payload) => {
         if (payload.eventType === 'DELETE') patchActive((t) => ({ ...t, team: removeById(t.team, (payload.old as MemberRow).id) }))
         else patchActive((t) => ({ ...t, team: upsertById(t.team, memberFromRow(payload.new as MemberRow)) }))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trip_member_sensitive', filter: `trip_id=eq.${id}` }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          const removedId = (payload.old as SensitiveRow).trip_member_id
+          patchActive((t) => {
+            const next = { ...t.sensitiveByMember }
+            delete next[removedId]
+            return { ...t, sensitiveByMember: next }
+          })
+        } else {
+          const row = payload.new as SensitiveRow
+          patchActive((t) => ({ ...t, sensitiveByMember: { ...t.sensitiveByMember, [row.trip_member_id]: sensitiveFromRow(row) } }))
+        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'destinations', filter: `trip_id=eq.${id}` }, (payload) => {
         if (payload.eventType === 'DELETE')
@@ -380,6 +405,43 @@ export const useStore = create<Store>((set, get) => ({
     supabase.from('trip_members').delete().eq('id', id)
   },
 
+  updateMemberSensitive: (memberId, patch) => {
+    const tripId = get().activeTripId
+    if (!tripId) return
+    set((s) =>
+      s.activeTripData
+        ? {
+            activeTripData: {
+              ...s.activeTripData,
+              sensitiveByMember: {
+                ...s.activeTripData.sensitiveByMember,
+                [memberId]: { ...s.activeTripData.sensitiveByMember[memberId], ...patch },
+              },
+            },
+          }
+        : {},
+    )
+    supabase
+      .from('trip_member_sensitive')
+      .upsert({ trip_member_id: memberId, trip_id: tripId, ...sensitiveToRow(patch) }, { onConflict: 'trip_member_id' })
+  },
+
+  uploadPassportPhoto: async (memberId, file) => {
+    const tripId = get().activeTripId
+    if (!tripId) return
+    const ext = file.type.includes('png') ? 'png' : 'jpg'
+    const path = `${tripId}/${memberId}.${ext}`
+    const { error } = await supabase.storage.from('passport-photos').upload(path, file, { upsert: true })
+    if (error) return
+    get().updateMemberSensitive(memberId, { passportPhotoPath: path })
+  },
+
+  getPassportPhotoUrl: async (path) => {
+    const { data, error } = await supabase.storage.from('passport-photos').createSignedUrl(path, 3600)
+    if (error || !data) return null
+    return data.signedUrl
+  },
+
   addEvent: (e) => {
     const tripId = get().activeTripId
     if (!tripId) return
@@ -486,6 +548,7 @@ const EMPTY_TRIP: TripRecord = {
   events: [],
   expenses: [],
   options: [],
+  sensitiveByMember: {},
 }
 
 export function useActiveTrip(): TripRecord {
