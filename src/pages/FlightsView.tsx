@@ -1,10 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plane, Plus, Trash2, RadioTower, RotateCw } from 'lucide-react'
+import { Plane, Plus, Trash2, RadioTower, RotateCw, Clock, Route } from 'lucide-react'
 import { useStore, useActiveTrip } from '../store'
 import { Modal } from '../components/Modal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { fetchFlightStatus, type FlightStatus } from '../lib/flightStatus'
-import { fmtAmPm, fmtAmPmFromIso, homeAirport, isReturnLeg, sortedFlightEvents } from '../lib/flightHelpers'
+import {
+  fmtAmPm,
+  fmtAmPmFromIso,
+  fmtAmPmInZone,
+  fmtShortDateInZone,
+  formatDurationMs,
+  homeboundStartIso,
+  isHomeboundLeg,
+  sortedFlightEvents,
+  zonedTimeToUtcIso,
+  type FlightEventWithDetails,
+} from '../lib/flightHelpers'
+import { airportTimeZone, airportCoords, greatCircleMiles } from '../lib/airports'
 import type { CalendarEvent } from '../types'
 
 function initials(name: string) {
@@ -14,15 +26,17 @@ function initials(name: string) {
 export function FlightsView() {
   const active = useActiveTrip()
   const flights = useMemo(() => sortedFlightEvents(active.events, active.flightsByEvent), [active.events, active.flightsByEvent])
-  const home = useMemo(() => homeAirport(flights), [flights])
+  const homeboundStart = useMemo(() => homeboundStartIso(active.destinations), [active.destinations])
   const [adding, setAdding] = useState(false)
   const [openEventId, setOpenEventId] = useState<string | null>(null)
+
+  const outbound = flights.filter((f) => !isHomeboundLeg(f.event, homeboundStart))
+  const returning = flights.filter((f) => isHomeboundLeg(f.event, homeboundStart))
 
   return (
     <div className="px-3 py-4 md:px-6 md:py-6">
       <div className="mx-auto max-w-[1600px]">
-        <div className="mb-6 flex items-center justify-between">
-          <p className="text-base text-stone-500">Every flight on this trip, with seat assignments and live status.</p>
+        <div className="mb-6 flex items-center justify-end">
           <button
             onClick={() => setAdding(true)}
             className="flex items-center gap-1 rounded-lg bg-brand-mint-dark px-3 py-1.5 text-xs font-medium text-white hover:brightness-95"
@@ -32,25 +46,74 @@ export function FlightsView() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {flights.length === 0 && (
-            <div className="col-span-full rounded-xl border border-dashed border-stone-300 px-5 py-10 text-center text-base text-stone-400">
-              No flights added yet.
-            </div>
-          )}
-          {flights.map(({ event, flight }) => (
-            <FlightCard
-              key={event.id}
-              event={event}
-              isReturn={isReturnLeg(flight, home)}
-              onOpen={() => setOpenEventId(event.id)}
-            />
-          ))}
-        </div>
+        {flights.length === 0 && (
+          <div className="rounded-xl border border-dashed border-stone-300 px-5 py-10 text-center text-base text-stone-400">
+            No flights added yet.
+          </div>
+        )}
+
+        <FlightGroup label="Outbound" tone="green" flights={outbound} onOpen={setOpenEventId} />
+        <FlightGroup label="Return" tone="yellow" flights={returning} onOpen={setOpenEventId} />
       </div>
 
       {adding && <AddFlightForm onClose={() => setAdding(false)} />}
       {openEventId && <FlightDetailModal eventId={openEventId} onClose={() => setOpenEventId(null)} />}
+    </div>
+  )
+}
+
+function FlightGroup({
+  label,
+  tone,
+  flights,
+  onOpen,
+}: {
+  label: string
+  tone: 'green' | 'yellow'
+  flights: FlightEventWithDetails[]
+  onOpen: (eventId: string) => void
+}) {
+  if (flights.length === 0) return null
+
+  const first = flights[0]
+  const last = flights[flights.length - 1]
+  const depIso = first.flight?.departureTime
+  const arrIso = last.flight?.arrivalTime
+  const totalTime = depIso && arrIso ? formatDurationMs(new Date(arrIso).getTime() - new Date(depIso).getTime()) : null
+
+  const depCoords = airportCoords(first.flight?.departureAirport)
+  const arrCoords = airportCoords(last.flight?.arrivalAirport)
+  const totalMiles = depCoords && arrCoords ? Math.round(greatCircleMiles(depCoords, arrCoords)) : null
+
+  const toneClasses =
+    tone === 'green'
+      ? { border: 'border-emerald-200', bg: 'bg-emerald-50/50', glow: 'shadow-[0_0_50px_-12px_rgba(16,185,129,0.45)]', text: 'text-emerald-700' }
+      : { border: 'border-amber-200', bg: 'bg-amber-50/50', glow: 'shadow-[0_0_50px_-12px_rgba(217,161,10,0.45)]', text: 'text-amber-700' }
+
+  return (
+    <div className={`mb-8 rounded-2xl border ${toneClasses.border} ${toneClasses.bg} ${toneClasses.glow} p-4 md:p-5`}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
+        <h3 className={`text-sm font-bold uppercase tracking-wide ${toneClasses.text}`}>{label}</h3>
+        <div className={`flex items-center gap-4 text-sm font-semibold ${toneClasses.text}`}>
+          {totalTime && (
+            <span className="flex items-center gap-1.5">
+              <Clock size={14} />
+              {totalTime} total
+            </span>
+          )}
+          {totalMiles && (
+            <span className="flex items-center gap-1.5">
+              <Route size={14} />
+              {totalMiles.toLocaleString()} mi as the crow flies
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {flights.map(({ event }) => (
+          <FlightCard key={event.id} event={event} isReturn={tone === 'yellow'} onOpen={() => onOpen(event.id)} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -85,16 +148,22 @@ function FlightCard({ event, isReturn, onOpen }: { event: CalendarEvent; isRetur
 
       <div className="space-y-1 text-base">
         <div className="text-stone-600">
-          Take off: <span className="font-semibold">{flight?.departureTime ? fmtAmPmFromIso(flight.departureTime) : fmtAmPm(event.time ?? '00:00')}</span>
+          Take off:{' '}
+          <span className="font-semibold">
+            {flight?.departureTime ? fmtAmPmInZone(flight.departureTime, airportTimeZone(flight.departureAirport)) : fmtAmPm(event.time ?? '00:00')}
+          </span>
           {flight?.departureAirport && <span className="text-stone-400"> {flight.departureAirport}</span>}
+          {flight?.departureTime && (
+            <span className="text-stone-400"> &middot; {fmtShortDateInZone(flight.departureTime, airportTimeZone(flight.departureAirport))}</span>
+          )}
         </div>
         {flight?.arrivalTime && (
           <div className="font-semibold text-red-400">
-            Land: {fmtAmPmFromIso(flight.arrivalTime)}
+            Land: {fmtAmPmInZone(flight.arrivalTime, airportTimeZone(flight.arrivalAirport))}
             {flight.arrivalAirport && <span> {flight.arrivalAirport}</span>}
+            <span className="text-red-300"> &middot; {fmtShortDateInZone(flight.arrivalTime, airportTimeZone(flight.arrivalAirport))}</span>
           </div>
         )}
-        <div className="text-sm text-stone-400">{event.date}</div>
       </div>
 
       <LiveStatusCompact flightNumber={flight?.flightNumber} date={event.date} />
@@ -136,7 +205,15 @@ function LiveStatusCompact({ flightNumber, date }: { flightNumber?: string; date
 
   if (!flightNumber) return null
   if (loading) return <div className="text-sm text-stone-400">Checking live status&hellip;</div>
-  if (error || !status) return null
+
+  if (error || !status) {
+    return (
+      <div className="flex items-center gap-1.5 rounded-lg bg-stone-50 px-2.5 py-1.5 text-sm font-medium text-stone-400">
+        <RadioTower size={13} />
+        Status unavailable
+      </div>
+    )
+  }
 
   return (
     <div className="flex items-center gap-1.5 rounded-lg bg-stone-50 px-2.5 py-1.5 text-sm font-medium text-stone-600">
@@ -166,20 +243,26 @@ function AddFlightForm({ onClose }: { onClose: () => void }) {
 
   function submit() {
     if (!departureTime) return
-    const dep = new Date(departureTime)
-    const date = dep.toISOString().slice(0, 10)
+    const depAirport = departureAirport.trim().toUpperCase() || undefined
+    const arrAirport = arrivalAirport.trim().toUpperCase() || undefined
+    const depZone = airportTimeZone(depAirport)
+    const depIso = depZone ? zonedTimeToUtcIso(departureTime, depZone) : new Date(departureTime).toISOString()
+    const date = departureTime.slice(0, 10)
     const time = departureTime.slice(11, 16)
     const label = title.trim() || `${airline || 'Flight'}${flightNumber ? ` ${flightNumber}` : ''}`.trim() || 'Flight'
+
+    const arrZone = airportTimeZone(arrAirport)
+    const arrIso = arrivalTime ? (arrZone ? zonedTimeToUtcIso(arrivalTime, arrZone) : new Date(arrivalTime).toISOString()) : undefined
 
     addFlight(
       { date, time, title: label, destinationId, attendeeIds, notes: undefined, cost: undefined },
       {
         airline: airline.trim() || undefined,
         flightNumber: flightNumber.trim() || undefined,
-        departureAirport: departureAirport.trim().toUpperCase() || undefined,
-        arrivalAirport: arrivalAirport.trim().toUpperCase() || undefined,
-        departureTime: dep.toISOString(),
-        arrivalTime: arrivalTime ? new Date(arrivalTime).toISOString() : undefined,
+        departureAirport: depAirport,
+        arrivalAirport: arrAirport,
+        departureTime: depIso,
+        arrivalTime: arrIso,
       },
     )
     onClose()
@@ -360,12 +443,19 @@ function FlightDetailModal({ eventId, onClose }: { eventId: string; onClose: () 
     <Modal title={flight?.airline ? `${flight.airline} ${flight.flightNumber ?? ''}`.trim() : event.title} onClose={onClose}>
       <div className="space-y-4">
         <div className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-600">
-          Take off: <span className="font-semibold">{flight?.departureTime ? fmtAmPmFromIso(flight.departureTime) : `${event.date} ${event.time ?? ''}`}</span>
+          Take off:{' '}
+          <span className="font-semibold">
+            {flight?.departureTime ? fmtAmPmInZone(flight.departureTime, airportTimeZone(flight.departureAirport)) : `${event.date} ${event.time ?? ''}`}
+          </span>
           {flight?.departureAirport && ` ${flight.departureAirport}`}
+          {flight?.departureTime && (
+            <span className="text-stone-400"> &middot; {fmtShortDateInZone(flight.departureTime, airportTimeZone(flight.departureAirport))}</span>
+          )}
           {flight?.arrivalTime && (
             <div className="font-semibold text-red-400">
-              Land: {fmtAmPmFromIso(flight.arrivalTime)}
+              Land: {fmtAmPmInZone(flight.arrivalTime, airportTimeZone(flight.arrivalAirport))}
               {flight.arrivalAirport && ` ${flight.arrivalAirport}`}
+              <span className="text-red-300"> &middot; {fmtShortDateInZone(flight.arrivalTime, airportTimeZone(flight.arrivalAirport))}</span>
             </div>
           )}
         </div>
@@ -425,9 +515,9 @@ function FlightDetailModal({ eventId, onClose }: { eventId: string; onClose: () 
                 >
                   {initials(m.name)}
                 </div>
-                <span className="flex-1 text-sm text-stone-700">{m.name}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-stone-700">{m.name}</span>
                 <input
-                  className="input w-24 text-center"
+                  className="input !w-24 shrink-0 text-center"
                   defaultValue={flight?.seats[m.id] ?? ''}
                   placeholder="Seat"
                   onBlur={(e) => setFlightSeat(eventId, m.id, e.target.value.toUpperCase())}

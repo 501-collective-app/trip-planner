@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { Plane } from 'lucide-react'
+import { Plane, BedDouble } from 'lucide-react'
 import { useActiveTrip } from '../store'
 import { destinationForDate, money, tripDateRange } from '../lib/derive'
-import { todayIso } from '../lib/date'
-import { fmtAmPm, fmtAmPmFromIso, homeAirport, isFinalLanding, isReturnLeg, sortedFlightEvents } from '../lib/flightHelpers'
+import { todayIso, formatDateRangeLong } from '../lib/date'
+import { fmtAmPm, fmtAmPmInZone, homeboundStartIso, isFinalLanding, isHomeboundLeg, sortedFlightEvents } from '../lib/flightHelpers'
+import { airportTimeZone } from '../lib/airports'
 import { WeatherChip } from '../components/WeatherChip'
 import { DayDetailModal } from '../components/DayDetailModal'
 
@@ -15,7 +16,7 @@ export function CalendarView() {
   const dates = useMemo(() => tripDateRange(active), [active.trip.startDate, active.trip.endDate])
 
   const flights = useMemo(() => sortedFlightEvents(active.events, active.flightsByEvent), [active.events, active.flightsByEvent])
-  const home = useMemo(() => homeAirport(flights), [flights])
+  const homeboundStart = useMemo(() => homeboundStartIso(active.destinations), [active.destinations])
   const finalLandingByEventId = useMemo(() => {
     const set = new Set<string>()
     flights.forEach((f, i) => {
@@ -24,14 +25,10 @@ export function CalendarView() {
     return set
   }, [flights])
 
-  const rangeLabel = useMemo(() => {
-    const start = new Date(active.trip.startDate + 'T00:00:00')
-    const end = new Date(active.trip.endDate + 'T00:00:00')
-    const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
-    const startFmt = start.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
-    const endFmt = end.toLocaleDateString('en-US', sameMonth ? { day: 'numeric', year: 'numeric' } : { month: 'long', day: 'numeric', year: 'numeric' })
-    return `${startFmt} – ${endFmt}`
-  }, [active.trip.startDate, active.trip.endDate])
+  const rangeLabel = useMemo(
+    () => formatDateRangeLong(active.trip.startDate, active.trip.endDate),
+    [active.trip.startDate, active.trip.endDate],
+  )
 
   return (
     <div className="px-3 py-4 md:px-6 md:py-6">
@@ -46,7 +43,7 @@ export function CalendarView() {
               key={date}
               date={date}
               isToday={date === today}
-              home={home}
+              homeboundStart={homeboundStart}
               finalLandingByEventId={finalLandingByEventId}
               onOpen={() => setOpenDate(date)}
             />
@@ -62,13 +59,13 @@ export function CalendarView() {
 function DayCell({
   date,
   isToday,
-  home,
+  homeboundStart,
   finalLandingByEventId,
   onOpen,
 }: {
   date: string
   isToday: boolean
-  home: string | undefined
+  homeboundStart: string | undefined
   finalLandingByEventId: Set<string>
   onOpen: () => void
 }) {
@@ -76,7 +73,7 @@ function DayCell({
   const destination = destinationForDate(active.destinations, date)
   const dayEvents = active.events.filter((e) => e.date === date).sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
   const dayFlights = dayEvents.filter((e) => e.category === 'Flights')
-  const hasReturnFlight = dayFlights.some((e) => isReturnLeg(active.flightsByEvent[e.id], home))
+  const hasReturnFlight = dayFlights.some((e) => isHomeboundLeg(e, homeboundStart))
   const hasFlight = dayFlights.length > 0
   const dayNum = Number(date.slice(8, 10))
   const weekday = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' })
@@ -103,7 +100,11 @@ function DayCell({
         {destination && <WeatherChip destination={destination} date={date} compact />}
       </div>
 
-      {destination && <div className="truncate text-base font-medium text-stone-500">{destination.city}</div>}
+      {destination && (
+        <div className="truncate text-center text-lg font-extrabold text-brand-dark [text-shadow:0_0_16px_rgba(129,224,174,0.6)]">
+          {destination.city}
+        </div>
+      )}
 
       <div className="flex-1 space-y-1.5 overflow-hidden">
         {dayEvents.slice(0, 4).map((ev) => {
@@ -122,7 +123,7 @@ function DayCell({
               </div>
               {isFinal && flight?.arrivalTime && (
                 <div className="truncate font-semibold text-red-400">
-                  Land: {fmtAmPmFromIso(flight.arrivalTime)} {flight.arrivalAirport}
+                  Land: {fmtAmPmInZone(flight.arrivalTime, airportTimeZone(flight.arrivalAirport))} {flight.arrivalAirport}
                 </div>
               )}
             </div>
@@ -136,6 +137,13 @@ function DayCell({
       {dayEvents.some((e) => !!e.cost) && (
         <div className="text-right text-base font-semibold text-stone-500">
           {money(dayEvents.reduce((sum, e) => sum + (e.cost ?? 0), 0))}
+        </div>
+      )}
+
+      {destination?.lodgingName && (
+        <div className="mt-1 flex items-center gap-1.5 self-start truncate rounded-full bg-brand-mint/10 px-2.5 py-1 text-sm font-semibold text-brand-mint-dark shadow-[0_0_14px_-3px_rgba(129,224,174,0.7)]">
+          <BedDouble size={13} className="shrink-0" />
+          {destination.lodgingName}
         </div>
       )}
     </button>

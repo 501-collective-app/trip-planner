@@ -1,10 +1,13 @@
 import { useRef, useState } from 'react'
-import { Camera, Check, ExternalLink, Loader2 } from 'lucide-react'
+import { Camera, Check, CloudOff, ExternalLink, Loader2 } from 'lucide-react'
 import { useDropboxStore } from '../dropboxStore'
 import { createSharedLink, uploadToDropbox } from '../lib/dropbox'
 import { receiptFolder } from '../lib/dropboxPath'
+import { queueReceipt } from '../lib/receiptQueue'
+import { canAutoUpload } from '../lib/network'
 
 export function ReceiptCapture({
+  tripId,
   tripName,
   dropboxFolder,
   expenseDate,
@@ -13,6 +16,7 @@ export function ReceiptCapture({
   receiptUrl,
   onChange,
 }: {
+  tripId: string
   tripName: string
   dropboxFolder?: string
   expenseDate: string
@@ -23,10 +27,19 @@ export function ReceiptCapture({
 }) {
   const accessToken = useDropboxStore((s) => s.accessToken)
   const getValidAccessToken = useDropboxStore((s) => s.getValidAccessToken)
-  const [status, setStatus] = useState<'idle' | 'uploading' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'uploading' | 'error' | 'queued'>('idle')
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleFile(file: File) {
+    if (!(await canAutoUpload())) {
+      // Not confirmed to be on wifi — don't risk burning cellular data.
+      // Queue the raw photo (it'll land in the trip's Dropbox receipts
+      // folder once on wifi) and just leave this expense without a receipt
+      // link for now rather than blocking on an upload we shouldn't make.
+      await queueReceipt({ id: crypto.randomUUID(), blob: file, tripId, tripName, dropboxFolder, createdAt: new Date().toISOString() })
+      setStatus('queued')
+      return
+    }
     const token = await getValidAccessToken()
     if (!token) {
       setStatus('error')
@@ -83,6 +96,16 @@ export function ReceiptCapture({
             className="shrink-0 text-stone-400 hover:text-stone-600"
           >
             Replace
+          </button>
+        </div>
+      ) : status === 'queued' ? (
+        <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+          <CloudOff size={14} />
+          <span className="min-w-0 flex-1">
+            Not confirmed in the US or on WiFi — photo queued, will upload to your receipts folder automatically once it is.
+          </span>
+          <button type="button" onClick={() => inputRef.current?.click()} className="shrink-0 text-amber-500 hover:text-amber-700">
+            Retake
           </button>
         </div>
       ) : (

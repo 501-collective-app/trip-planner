@@ -19,8 +19,7 @@ export function ContactsView() {
 
   return (
     <div className="mx-auto max-w-3xl px-3 py-4 md:px-6 md:py-6">
-      <div className="mb-6 flex items-center justify-between">
-        <p className="text-sm text-stone-500">Organizers, hosts, drivers: anyone you need to reach on this trip.</p>
+      <div className="mb-6 flex items-center justify-end">
         <button
           onClick={() => setAdding(true)}
           className="flex items-center gap-1 rounded-lg bg-brand-mint-dark px-3 py-1.5 text-xs font-medium text-white hover:brightness-95"
@@ -53,7 +52,7 @@ export function ContactsView() {
             </div>
             {(c.phone || c.email) && (
               <div className="mt-3 flex flex-wrap gap-2">
-                {c.phone && (
+                {c.phone && c.hasWhatsApp !== false && (
                   <a
                     href={waHref(c.phone)}
                     target="_blank"
@@ -105,6 +104,7 @@ function ContactForm({ existing, onClose }: { existing?: Contact; onClose: () =>
   const [phone, setPhone] = useState(existing?.phone ?? '')
   const [email, setEmail] = useState(existing?.email ?? '')
   const [notes, setNotes] = useState(existing?.notes ?? '')
+  const [hasWhatsApp, setHasWhatsApp] = useState(existing?.hasWhatsApp ?? true)
 
   function submit() {
     if (!name.trim()) return
@@ -114,6 +114,7 @@ function ContactForm({ existing, onClose }: { existing?: Contact; onClose: () =>
       phone: phone.trim() || undefined,
       email: email.trim() || undefined,
       notes: notes.trim() || undefined,
+      hasWhatsApp,
     }
     if (existing) updateContact(existing.id, payload)
     else addContact(payload)
@@ -132,8 +133,12 @@ function ContactForm({ existing, onClose }: { existing?: Contact; onClose: () =>
           <input className="input" value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Trip organizer, Kenya" />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-stone-500">Phone / WhatsApp</span>
+          <span className="mb-1 block text-xs font-medium text-stone-500">Phone</span>
           <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254795557099" />
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={hasWhatsApp} onChange={(e) => setHasWhatsApp(e.target.checked)} className="h-4 w-4 rounded border-stone-300" />
+          <span className="text-sm text-stone-600">Has WhatsApp (uncheck for airline support lines, offices, etc.)</span>
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-stone-500">Email</span>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Check } from 'lucide-react'
 import { useStore, useActiveTrip } from '../store'
 import { money } from '../lib/derive'
+import { selectOnFocus } from '../lib/formUtils'
 import { Modal } from '../components/Modal'
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../types'
 
@@ -14,7 +15,7 @@ export function ActivitiesView() {
   return (
     <div className="mx-auto max-w-4xl px-3 py-4 md:px-6 md:py-6">
       <p className="mb-6 text-sm text-stone-500">
-        Things to do in each city, with cost. Toggle one on to add it to the calendar and count it toward the budget.
+        Toggle one on to add it to the calendar and count it toward the budget.
       </p>
 
       <div className="space-y-6">
@@ -117,7 +118,7 @@ function AddOption({ destinationId, onClose }: { destinationId: string; onClose:
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-stone-500">Cost (USD, total)</span>
-            <input className="input" type="number" min={0} value={cost} onChange={(e) => setCost(e.target.value)} />
+            <input className="input" type="number" min={0} value={cost} onFocus={selectOnFocus} onChange={(e) => setCost(e.target.value)} />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-stone-500">Category</span>

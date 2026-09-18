@@ -23,7 +23,7 @@ export function SignIn() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-brand-dark px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-xl">
-        <div className="mb-6">
+        <div className="mb-6 flex justify-center">
           <BrandMark on="light" />
         </div>
 

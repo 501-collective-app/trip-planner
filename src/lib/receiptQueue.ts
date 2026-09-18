@@ -1,10 +1,15 @@
-// Offline queue for scanned receipts. Stored in IndexedDB (survives reloads,
-// handles binary Blobs natively, unlike localStorage). Flushed whenever the
-// app comes back online or is reopened.
+// Queue for scanned receipts, stored in IndexedDB (survives reloads, handles
+// binary Blobs natively unlike localStorage). Receipts are queued whenever
+// we're offline, or not confirmed to be in the US, or not confirmed to be on
+// wifi — uploading dozens of photos is exactly the kind of thing that should
+// never happen silently over international cellular. The queue auto-flushes
+// once one of those is confirmed, or can be flushed on demand (an "Upload
+// now" button) when the platform can't auto-detect either signal.
 
 import { createSharedLink, uploadToDropbox } from './dropbox'
 import { useDropboxStore } from '../dropboxStore'
 import { receiptFolder } from './dropboxPath'
+import { canAutoUpload } from './network'
 
 export interface QueuedReceipt {
   id: string
@@ -61,8 +66,12 @@ export async function removeQueuedReceipt(id: string): Promise<void> {
 
 let flushing = false
 
-export async function flushReceiptQueue(): Promise<void> {
-  if (flushing || !navigator.onLine) return
+// `force: true` bypasses the wifi check — used by an explicit "Upload now"
+// button, since we can't auto-detect wifi at all on iOS Safari.
+export async function flushReceiptQueue(force = false): Promise<void> {
+  if (flushing) return
+  if (!force && !(await canAutoUpload())) return
+  if (!navigator.onLine) return
   flushing = true
   try {
     const items = await getQueuedReceipts()

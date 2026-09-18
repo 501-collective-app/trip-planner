@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useStore, useActiveTrip } from '../store'
 import { Modal } from './Modal'
+import { selectOnFocus } from '../lib/formUtils'
 import { EXPENSE_CATEGORIES, type CalendarEvent, type ExpenseCategory } from '../types'
 
 export function EventForm({
@@ -84,6 +85,7 @@ export function EventForm({
             type="number"
             min={0}
             value={cost}
+            onFocus={selectOnFocus}
             onChange={(e) => setCost(e.target.value)}
             placeholder="0"
           />

@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Camera, Check, CloudOff, Loader2, Plus, X } from 'lucide-react'
 import { useDropboxStore } from '../dropboxStore'
 import { createSharedLink, uploadToDropbox } from '../lib/dropbox'
-import { queueReceipt, flushReceiptQueue } from '../lib/receiptQueue'
+import { queueReceipt } from '../lib/receiptQueue'
 import { receiptFolder } from '../lib/dropboxPath'
+import { canAutoUpload } from '../lib/network'
 
 type Step = 'capturing' | 'confirm' | 'saving' | 'another'
 
@@ -47,7 +48,7 @@ export function ScanReceiptsFlow({
     setQueued(false)
 
     let succeeded = false
-    if (navigator.onLine) {
+    if (await canAutoUpload()) {
       try {
         const token = await getValidAccessToken()
         if (token) {
@@ -142,7 +143,7 @@ export function ScanReceiptsFlow({
             >
               {queued ? <CloudOff size={26} /> : <Check size={26} />}
             </div>
-            <p className="text-base font-medium text-white">{queued ? 'Saved, will upload once online' : 'Uploaded to Dropbox'}</p>
+            <p className="text-base font-medium text-white">{queued ? 'Saved, will upload once back in the US (or on WiFi)' : 'Uploaded to Dropbox'}</p>
             {!accessToken && !queued && (
               <p className="mt-1 text-xs text-white/40">Connect Dropbox in Settings to actually upload receipts.</p>
             )}
@@ -180,13 +181,6 @@ export function ScanReceiptsButton({
   className?: string
 }) {
   const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    flushReceiptQueue()
-    const onOnline = () => flushReceiptQueue()
-    window.addEventListener('online', onOnline)
-    return () => window.removeEventListener('online', onOnline)
-  }, [])
 
   return (
     <>
