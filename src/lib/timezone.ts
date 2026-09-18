@@ -17,3 +17,26 @@ export function fetchTimezone(lat: number, lon: number): Promise<string | null> 
   cache.set(key, promise)
   return promise
 }
+
+// Minutes offset from UTC for a given IANA zone at a given instant (handles DST correctly).
+export function utcOffsetMinutes(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date)
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value)
+  const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'), get('second'))
+  return (asUtc - date.getTime()) / 60_000
+}
+
+// Rough daytime check (6am-6pm local) for a zone, used for a day/night indicator.
+export function isDaytimeInZone(date: Date, timeZone: string): boolean {
+  const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', hour12: false }).format(date))
+  return hour >= 6 && hour < 18
+}

@@ -1,5 +1,6 @@
 // open.er-api.com — free, no key, covers ~160 currencies including KES/UGX/RWF/UAH/RON etc.
 // Rates are "units of CODE per 1 USD".
+import { currencyForCountry as lookupCurrency } from '../data/currencies'
 
 let ratesPromise: Promise<Record<string, number>> | null = null
 
@@ -33,4 +34,12 @@ export function formatMoney(amount: number, currency: string): string {
   } catch {
     return `${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${currency}`
   }
+}
+
+// Country -> currency code, for the header's "$1 = X KES" chip. Reuses the
+// same country/currency map BudgetView already uses for expense FX
+// conversion (src/data/currencies.ts) rather than keeping a second list.
+export function currencyForCountry(country: string | undefined): string | undefined {
+  if (!country) return undefined
+  return lookupCurrency(country)?.code ?? undefined
 }

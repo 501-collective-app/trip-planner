@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Search, RotateCcw, Cloud, CloudOff, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Search, RotateCcw, Cloud, CloudOff, Loader2, BedDouble } from 'lucide-react'
 import { useStore, useActiveTrip } from '../store'
 import { useDropboxStore } from '../dropboxStore'
+import { redirectUri } from '../lib/dropbox'
 import { geocodeCity } from '../lib/geocode'
-import { getQueuedReceipts } from '../lib/receiptQueue'
+import { formatDateRange } from '../lib/date'
+import { getQueuedReceipts, flushReceiptQueue } from '../lib/receiptQueue'
+import { connectionKindIsDetectable } from '../lib/network'
+import { selectOnFocus } from '../lib/formUtils'
 import { receiptFolder } from '../lib/dropboxPath'
 import { Modal } from '../components/Modal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import type { Destination } from '../types'
 
 export function SettingsView() {
   const active = useActiveTrip()
@@ -16,6 +21,7 @@ export function SettingsView() {
   const resetActiveTripToSample = useStore((s) => s.resetActiveTripToSample)
   const [addingDest, setAddingDest] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [editingDestId, setEditingDestId] = useState<string | null>(null)
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-3 py-4 md:px-6 md:py-6">
@@ -45,6 +51,7 @@ export function SettingsView() {
               type="number"
               min={0}
               value={trip.totalBudget}
+              onFocus={selectOnFocus}
               onChange={(e) => updateTrip({ totalBudget: Number(e.target.value) })}
             />
           </label>
@@ -65,25 +72,41 @@ export function SettingsView() {
         <div className="divide-y divide-stone-100">
           {destinations.length === 0 && <div className="px-5 py-4 text-sm text-stone-400">No destinations yet.</div>}
           {destinations.map((d) => (
-            <div key={d.id} className="flex items-center gap-4 px-4 py-3.5 md:px-5">
+            <button
+              key={d.id}
+              onClick={() => setEditingDestId(d.id)}
+              className="flex w-full items-center gap-4 px-4 py-3.5 text-left hover:bg-stone-50 md:px-5"
+            >
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-stone-900">
                   {d.city}, {d.country}
                 </div>
-                <div className="text-xs text-stone-500">
-                  {d.arrive} &rarr; {d.depart} &middot; {d.lat.toFixed(2)}, {d.lon.toFixed(2)}
-                </div>
+                <div className="text-xs text-stone-500">{formatDateRange(d.arrive, d.depart)}</div>
+                {d.lodgingName && (
+                  <div className="mt-0.5 flex items-center gap-1 text-xs text-stone-400">
+                    <BedDouble size={11} />
+                    {d.lodgingName}
+                  </div>
+                )}
               </div>
-              <button
-                onClick={() => removeDestination(d.id)}
+              <span
+                onClick={(e) => {
+                  e.stopPropagation()
+                  removeDestination(d.id)
+                }}
+                role="button"
                 className="shrink-0 rounded-lg p-1.5 text-stone-300 hover:bg-red-50 hover:text-red-500"
               >
                 <Trash2 size={14} />
-              </button>
-            </div>
+              </span>
+            </button>
           ))}
         </div>
       </section>
+
+      {editingDestId && (
+        <DestinationEditModal destination={destinations.find((d) => d.id === editingDestId)!} onClose={() => setEditingDestId(null)} />
+      )}
 
       <DropboxSection />
 
@@ -174,6 +197,7 @@ function DropboxSection() {
   const disconnect = useDropboxStore((s) => s.disconnect)
   const completeAuthIfNeeded = useDropboxStore((s) => s.completeAuthIfNeeded)
   const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const [uploadingNow, setUploadingNow] = useState(false)
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('code')) completeAuthIfNeeded()
@@ -184,6 +208,13 @@ function DropboxSection() {
     const id = setInterval(() => getQueuedReceipts().then((items) => setPendingCount(items.length)), 4000)
     return () => clearInterval(id)
   }, [])
+
+  async function uploadNow() {
+    setUploadingNow(true)
+    await flushReceiptQueue(true)
+    setPendingCount((await getQueuedReceipts()).length)
+    setUploadingNow(false)
+  }
 
   return (
     <section className="rounded-xl border border-stone-200 bg-white p-4 md:p-5">
@@ -197,9 +228,20 @@ function DropboxSection() {
       </p>
 
       {!!pendingCount && (
-        <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-          {pendingCount} receipt{pendingCount === 1 ? '' : 's'} saved offline, waiting to upload once you're back online.
-        </p>
+        <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
+          <p>
+            {pendingCount} receipt{pendingCount === 1 ? '' : 's'} queued &mdash; not confirmed to be in the US or on WiFi yet. They'll
+            upload automatically once one of those is true{connectionKindIsDetectable() ? '' : ' (tap below any time to check now)'}.
+          </p>
+          <button
+            onClick={uploadNow}
+            disabled={uploadingNow}
+            className="mt-2 flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:brightness-95 disabled:opacity-50"
+          >
+            {uploadingNow ? <Loader2 size={13} className="animate-spin" /> : <Cloud size={13} />}
+            {uploadingNow ? 'Uploading…' : 'Upload now'}
+          </button>
+        </div>
       )}
 
       {accessToken ? (
@@ -230,10 +272,13 @@ function DropboxSection() {
             {connecting ? <Loader2 size={14} className="animate-spin" /> : <Cloud size={14} />}
             Connect Dropbox
           </button>
-          <p className="text-xs text-stone-400">
-            You'll be sent to dropbox.com to approve access, then back here. Add this page's URL as a redirect URI on your
-            Dropbox app first.
-          </p>
+          <div className="text-xs text-stone-400">
+            <p className="mb-1">
+              You'll be sent to dropbox.com to approve access, then back here. First, add this exact URL as a redirect URI on
+              your Dropbox app (dropbox.com/developers/apps &rarr; your app &rarr; OAuth 2 &rarr; Redirect URIs):
+            </p>
+            <code className="block select-all break-all rounded bg-stone-100 px-2 py-1.5 text-stone-600">{redirectUri()}</code>
+          </div>
         </div>
       )}
 
@@ -328,6 +373,70 @@ function AddDestination({ onClose }: { onClose: () => void }) {
             className="rounded-lg bg-brand-mint-dark px-4 py-2 text-sm font-medium text-white hover:brightness-95 disabled:opacity-40"
           >
             Add destination
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function DestinationEditModal({ destination, onClose }: { destination: Destination; onClose: () => void }) {
+  const updateDestination = useStore((s) => s.updateDestination)
+  const [lodgingName, setLodgingName] = useState(destination.lodgingName ?? '')
+  const [lodgingAddress, setLodgingAddress] = useState(destination.lodgingAddress ?? '')
+  const [lodgingConfirmation, setLodgingConfirmation] = useState(destination.lodgingConfirmation ?? '')
+  const [lodgingCheckin, setLodgingCheckin] = useState(destination.lodgingCheckin ?? '')
+  const [lodgingCheckout, setLodgingCheckout] = useState(destination.lodgingCheckout ?? '')
+
+  function save() {
+    // Send the trimmed value even when empty (not `undefined`) — updateDestination
+    // only writes fields that aren't `undefined`, so clearing a field to blank
+    // has to actually send '' or the old value would silently stick around.
+    updateDestination(destination.id, {
+      lodgingName: lodgingName.trim(),
+      lodgingAddress: lodgingAddress.trim(),
+      lodgingConfirmation: lodgingConfirmation.trim(),
+      lodgingCheckin: lodgingCheckin.trim(),
+      lodgingCheckout: lodgingCheckout.trim(),
+    })
+    onClose()
+  }
+
+  return (
+    <Modal title={`${destination.city}, ${destination.country}`} onClose={onClose}>
+      <div className="space-y-4">
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-stone-400">
+          <BedDouble size={13} />
+          Lodging
+        </div>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-stone-500">Hotel / lodging name</span>
+          <input className="input" value={lodgingName} onChange={(e) => setLodgingName(e.target.value)} placeholder="e.g. Sarova Stanley" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-stone-500">Address</span>
+          <input className="input" value={lodgingAddress} onChange={(e) => setLodgingAddress(e.target.value)} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-stone-500">Confirmation number</span>
+          <input className="input" value={lodgingConfirmation} onChange={(e) => setLodgingConfirmation(e.target.value)} />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-500">Check-in</span>
+            <input className="input" value={lodgingCheckin} onChange={(e) => setLodgingCheckin(e.target.value)} placeholder="3:00 PM" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-500">Check-out</span>
+            <input className="input" value={lodgingCheckout} onChange={(e) => setLodgingCheckout(e.target.value)} placeholder="11:00 AM" />
+          </label>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100">
+            Cancel
+          </button>
+          <button onClick={save} className="rounded-lg bg-brand-mint-dark px-4 py-2 text-sm font-medium text-white hover:brightness-95">
+            Save
           </button>
         </div>
       </div>

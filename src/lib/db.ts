@@ -1,4 +1,4 @@
-import type { ActivityOption, CalendarEvent, Contact, Destination, Expense, FlightDetails, MemberSensitive, TeamMember, Trip } from '../types'
+import type { ActivityOption, CalendarEvent, ChecklistItem, Contact, Destination, Expense, FlightDetails, MemberSensitive, TeamMember, Trip } from '../types'
 
 // Supabase rows are snake_case; the app's types are camelCase. These convert both ways.
 
@@ -66,12 +66,18 @@ export interface SensitiveRow {
   legal_name: string | null
   emergency_contact: string | null
   passport_photo_path: string | null
+  passport_number: string | null
+  passport_expiry: string | null
+  visa_status: string | null
 }
 export function sensitiveFromRow(r: SensitiveRow): MemberSensitive {
   return {
     legalName: r.legal_name ?? undefined,
     emergencyContact: r.emergency_contact ?? undefined,
     passportPhotoPath: r.passport_photo_path ?? undefined,
+    passportNumber: r.passport_number ?? undefined,
+    passportExpiry: r.passport_expiry ?? undefined,
+    visaStatus: r.visa_status ?? undefined,
   }
 }
 export function sensitiveToRow(s: Partial<MemberSensitive>) {
@@ -79,6 +85,9 @@ export function sensitiveToRow(s: Partial<MemberSensitive>) {
   if (s.legalName !== undefined) row.legal_name = s.legalName
   if (s.emergencyContact !== undefined) row.emergency_contact = s.emergencyContact
   if (s.passportPhotoPath !== undefined) row.passport_photo_path = s.passportPhotoPath
+  if (s.passportNumber !== undefined) row.passport_number = s.passportNumber
+  if (s.passportExpiry !== undefined) row.passport_expiry = s.passportExpiry || null
+  if (s.visaStatus !== undefined) row.visa_status = s.visaStatus
   return row
 }
 
@@ -92,9 +101,28 @@ export interface DestinationRow {
   arrive: string
   depart: string
   notes: string | null
+  lodging_name: string | null
+  lodging_address: string | null
+  lodging_confirmation: string | null
+  lodging_checkin: string | null
+  lodging_checkout: string | null
 }
 export function destinationFromRow(r: DestinationRow): Destination {
-  return { id: r.id, city: r.city, country: r.country, lat: r.lat, lon: r.lon, arrive: r.arrive, depart: r.depart, notes: r.notes ?? undefined }
+  return {
+    id: r.id,
+    city: r.city,
+    country: r.country,
+    lat: r.lat,
+    lon: r.lon,
+    arrive: r.arrive,
+    depart: r.depart,
+    notes: r.notes ?? undefined,
+    lodgingName: r.lodging_name ?? undefined,
+    lodgingAddress: r.lodging_address ?? undefined,
+    lodgingConfirmation: r.lodging_confirmation ?? undefined,
+    lodgingCheckin: r.lodging_checkin ?? undefined,
+    lodgingCheckout: r.lodging_checkout ?? undefined,
+  }
 }
 export function destinationToRow(d: Partial<Destination>) {
   const row: Record<string, unknown> = {}
@@ -105,6 +133,11 @@ export function destinationToRow(d: Partial<Destination>) {
   if (d.arrive !== undefined) row.arrive = d.arrive
   if (d.depart !== undefined) row.depart = d.depart
   if (d.notes !== undefined) row.notes = d.notes
+  if (d.lodgingName !== undefined) row.lodging_name = d.lodgingName
+  if (d.lodgingAddress !== undefined) row.lodging_address = d.lodgingAddress
+  if (d.lodgingConfirmation !== undefined) row.lodging_confirmation = d.lodgingConfirmation
+  if (d.lodgingCheckin !== undefined) row.lodging_checkin = d.lodgingCheckin
+  if (d.lodgingCheckout !== undefined) row.lodging_checkout = d.lodgingCheckout
   return row
 }
 
@@ -239,9 +272,18 @@ export interface ContactRow {
   phone: string | null
   email: string | null
   notes: string | null
+  has_whatsapp: boolean
 }
 export function contactFromRow(r: ContactRow): Contact {
-  return { id: r.id, name: r.name, role: r.role ?? undefined, phone: r.phone ?? undefined, email: r.email ?? undefined, notes: r.notes ?? undefined }
+  return {
+    id: r.id,
+    name: r.name,
+    role: r.role ?? undefined,
+    phone: r.phone ?? undefined,
+    email: r.email ?? undefined,
+    notes: r.notes ?? undefined,
+    hasWhatsApp: r.has_whatsapp,
+  }
 }
 export function contactToRow(c: Partial<Contact>) {
   const row: Record<string, unknown> = {}
@@ -250,6 +292,7 @@ export function contactToRow(c: Partial<Contact>) {
   if (c.phone !== undefined) row.phone = c.phone
   if (c.email !== undefined) row.email = c.email
   if (c.notes !== undefined) row.notes = c.notes
+  if (c.hasWhatsApp !== undefined) row.has_whatsapp = c.hasWhatsApp
   return row
 }
 
@@ -282,5 +325,21 @@ export function optionToRow(o: Partial<ActivityOption>) {
   if (o.cost !== undefined) row.cost = o.cost
   if (o.category !== undefined) row.category = o.category
   if (o.addedToSchedule !== undefined) row.added_to_schedule = o.addedToSchedule
+  return row
+}
+
+export interface ChecklistItemRow {
+  id: string
+  trip_id: string
+  text: string
+  done: boolean
+}
+export function checklistItemFromRow(r: ChecklistItemRow): ChecklistItem {
+  return { id: r.id, text: r.text, done: r.done }
+}
+export function checklistItemToRow(c: Partial<ChecklistItem>) {
+  const row: Record<string, unknown> = {}
+  if (c.text !== undefined) row.text = c.text
+  if (c.done !== undefined) row.done = c.done
   return row
 }

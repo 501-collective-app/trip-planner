@@ -19,7 +19,7 @@ async function generateChallenge(verifier: string): Promise<string> {
   return base64UrlEncode(digest)
 }
 
-function redirectUri(): string {
+export function redirectUri(): string {
   return window.location.origin + window.location.pathname
 }
 

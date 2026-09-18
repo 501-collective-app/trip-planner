@@ -26,6 +26,11 @@ export interface Destination {
   arrive: string // ISO date
   depart: string // ISO date
   notes?: string
+  lodgingName?: string
+  lodgingAddress?: string
+  lodgingConfirmation?: string
+  lodgingCheckin?: string
+  lodgingCheckout?: string
 }
 
 export type MemberType = 'trip_leader' | 'team_member'
@@ -46,6 +51,9 @@ export interface MemberSensitive {
   legalName?: string
   emergencyContact?: string
   passportPhotoPath?: string
+  passportNumber?: string
+  passportExpiry?: string // ISO date
+  visaStatus?: string
 }
 
 export interface CalendarEvent {
@@ -104,6 +112,13 @@ export interface Contact {
   phone?: string
   email?: string
   notes?: string
+  hasWhatsApp?: boolean // defaults to true when unset, for contacts added before this field existed
+}
+
+export interface ChecklistItem {
+  id: string
+  text: string
+  done: boolean
 }
 
 export interface Trip {
@@ -125,6 +140,7 @@ export interface TripState {
   sensitiveByMember: Record<string, MemberSensitive> // keyed by TeamMember.id
   flightsByEvent: Record<string, FlightDetails> // keyed by CalendarEvent.id
   contacts: Contact[]
+  checklist: ChecklistItem[]
 }
 
 export interface TripRecord extends TripState {

@@ -6,6 +6,7 @@ import { destinationsForDateRange, money, spentByCategory, totalSpent } from '..
 import { todayIso, tomorrowIso } from '../lib/date'
 import { currencyForCountry } from '../data/currencies'
 import { formatMoney, toUsd } from '../lib/currency'
+import { selectOnFocus } from '../lib/formUtils'
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from '../types'
 import { Modal } from '../components/Modal'
 import { ReceiptCapture } from '../components/ReceiptCapture'
@@ -192,7 +193,7 @@ function AddExpense({ onClose }: { onClose: () => void }) {
         <div className="grid grid-cols-[1fr_auto] gap-3">
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-stone-500">Amount</span>
-            <input className="input" type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <input className="input" type="number" min={0} value={amount} onFocus={selectOnFocus} onChange={(e) => setAmount(e.target.value)} />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-stone-500">Currency</span>
@@ -246,6 +247,7 @@ function AddExpense({ onClose }: { onClose: () => void }) {
         </label>
 
         <ReceiptCapture
+          tripId={active.id}
           tripName={trip.name}
           dropboxFolder={trip.dropboxFolder}
           expenseDate={date}

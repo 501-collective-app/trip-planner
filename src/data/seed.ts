@@ -99,6 +99,7 @@ export function makeSampleTrip(id: string): TripRecord {
     sensitiveByMember: {},
     flightsByEvent: {},
     contacts: [],
+    checklist: [],
   }
 }
 
@@ -125,5 +126,6 @@ export function makeBlankTrip(id: string, name = 'New Trip'): TripRecord {
     sensitiveByMember: {},
     flightsByEvent: {},
     contacts: [],
+    checklist: [],
   }
 }

@@ -3,6 +3,8 @@ import type { RealtimeChannel, Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabaseClient'
 import { makeSampleTrip, makeBlankTrip } from './data/seed'
 import {
+  checklistItemFromRow,
+  checklistItemToRow,
   contactFromRow,
   contactToRow,
   destinationFromRow,
@@ -30,10 +32,12 @@ import {
   type OptionRow,
   type SensitiveRow,
   type TripRow,
+  type ChecklistItemRow,
 } from './lib/db'
 import type {
   ActivityOption,
   CalendarEvent,
+  ChecklistItem,
   Contact,
   Destination,
   Expense,
@@ -93,7 +97,7 @@ interface Store {
   updateTeamMember: (id: string, patch: Partial<TeamMember>) => void
   removeTeamMember: (id: string) => void
   updateMemberSensitive: (memberId: string, patch: Partial<MemberSensitive>) => void
-  uploadPassportPhoto: (memberId: string, file: File) => Promise<void>
+  uploadPassportPhoto: (memberId: string, file: File) => Promise<{ error: string | null }>
   getPassportPhotoUrl: (path: string) => Promise<string | null>
 
   addEvent: (e: Omit<CalendarEvent, 'id'>) => void
@@ -114,11 +118,16 @@ interface Store {
   updateContact: (id: string, patch: Partial<Contact>) => void
   removeContact: (id: string) => void
 
+  addChecklistItem: (text: string) => void
+  toggleChecklistItem: (id: string, done: boolean) => void
+  removeChecklistItem: (id: string) => void
+
   resetActiveTripToSample: () => Promise<void>
 }
 
 let realtimeChannel: RealtimeChannel | null = null
 let tripNameDebounce: ReturnType<typeof setTimeout> | null = null
+const passportUrlCache = new Map<string, { url: string; expiresAt: number }>()
 let seedingPromise: Promise<void> | null = null
 
 async function ensureSelfMembership(tripId: string, userId: string, email: string, name: string) {
@@ -270,6 +279,7 @@ export const useStore = create<Store>((set, get) => ({
       { data: sensitive },
       { data: flights },
       { data: contacts },
+      { data: checklist },
     ] = await Promise.all([
       supabase.from('trip_members').select('*').eq('trip_id', id),
       supabase.from('destinations').select('*').eq('trip_id', id),
@@ -279,6 +289,7 @@ export const useStore = create<Store>((set, get) => ({
       supabase.from('trip_member_sensitive').select('*').eq('trip_id', id),
       supabase.from('flight_details').select('*').eq('trip_id', id),
       supabase.from('contacts').select('*').eq('trip_id', id),
+      supabase.from('checklist_items').select('*').eq('trip_id', id),
     ])
 
     if (get().activeTripId !== id) return // switched again before this resolved
@@ -307,6 +318,7 @@ export const useStore = create<Store>((set, get) => ({
           ((flights as FlightDetailsRow[] | null) ?? []).map((r) => [r.event_id, flightDetailsFromRow(r)]),
         ),
         contacts: ((contacts as ContactRow[] | null) ?? []).map(contactFromRow),
+        checklist: ((checklist as ChecklistItemRow[] | null) ?? []).map(checklistItemFromRow),
       },
       loadingActiveTrip: false,
     })
@@ -379,6 +391,10 @@ export const useStore = create<Store>((set, get) => ({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_options', filter: `trip_id=eq.${id}` }, (payload) => {
         if (payload.eventType === 'DELETE') patchActive((t) => ({ ...t, options: removeById(t.options, (payload.old as OptionRow).id) }))
         else patchActive((t) => ({ ...t, options: upsertById(t.options, optionFromRow(payload.new as OptionRow)) }))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'checklist_items', filter: `trip_id=eq.${id}` }, (payload) => {
+        if (payload.eventType === 'DELETE') patchActive((t) => ({ ...t, checklist: removeById(t.checklist, (payload.old as ChecklistItemRow).id) }))
+        else patchActive((t) => ({ ...t, checklist: upsertById(t.checklist, checklistItemFromRow(payload.new as ChecklistItemRow)) }))
       })
       .subscribe()
   },
@@ -493,21 +509,32 @@ export const useStore = create<Store>((set, get) => ({
     supabase
       .from('trip_member_sensitive')
       .upsert({ trip_member_id: memberId, trip_id: tripId, ...sensitiveToRow(patch) }, { onConflict: 'trip_member_id' })
+      .then(({ error }) => {
+        if (error) console.error('updateMemberSensitive failed:', error.message)
+      })
   },
 
   uploadPassportPhoto: async (memberId, file) => {
     const tripId = get().activeTripId
-    if (!tripId) return
+    if (!tripId) return { error: 'No active trip' }
     const ext = file.type.includes('png') ? 'png' : 'jpg'
     const path = `${tripId}/${memberId}.${ext}`
     const { error } = await supabase.storage.from('passport-photos').upload(path, file, { upsert: true })
-    if (error) return
+    if (error) return { error: error.message }
+    passportUrlCache.delete(path) // the old signed URL now points at stale (overwritten) bytes
     get().updateMemberSensitive(memberId, { passportPhotoPath: path })
+    return { error: null }
   },
 
   getPassportPhotoUrl: async (path) => {
+    const cached = passportUrlCache.get(path)
+    if (cached && cached.expiresAt > Date.now()) return cached.url
     const { data, error } = await supabase.storage.from('passport-photos').createSignedUrl(path, 3600)
     if (error || !data) return null
+    // Cached (not just the promise) so re-opening the same photo within the
+    // session reuses the exact same URL, letting the browser's own HTTP/image
+    // cache serve it instead of re-downloading over possibly-metered data.
+    passportUrlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + 55 * 60_000 })
     return data.signedUrl
   },
 
@@ -631,6 +658,27 @@ export const useStore = create<Store>((set, get) => ({
     supabase.from('contacts').delete().eq('id', id)
   },
 
+  addChecklistItem: (text) => {
+    const tripId = get().activeTripId
+    if (!tripId || !text.trim()) return
+    const id = crypto.randomUUID()
+    const item: ChecklistItem = { id, text: text.trim(), done: false }
+    set((s) => (s.activeTripData ? { activeTripData: { ...s.activeTripData, checklist: [...s.activeTripData.checklist, item] } } : {}))
+    supabase.from('checklist_items').insert({ id, trip_id: tripId, ...checklistItemToRow(item) })
+  },
+  toggleChecklistItem: (id, done) => {
+    set((s) =>
+      s.activeTripData
+        ? { activeTripData: { ...s.activeTripData, checklist: s.activeTripData.checklist.map((c) => (c.id === id ? { ...c, done } : c)) } }
+        : {},
+    )
+    supabase.from('checklist_items').update({ done }).eq('id', id)
+  },
+  removeChecklistItem: (id) => {
+    set((s) => (s.activeTripData ? { activeTripData: { ...s.activeTripData, checklist: removeById(s.activeTripData.checklist, id) } } : {}))
+    supabase.from('checklist_items').delete().eq('id', id)
+  },
+
   resetActiveTripToSample: async () => {
     const tripId = get().activeTripId
     if (!tripId) return
@@ -686,6 +734,7 @@ const EMPTY_TRIP: TripRecord = {
   sensitiveByMember: {},
   flightsByEvent: {},
   contacts: [],
+  checklist: [],
 }
 
 export function useActiveTrip(): TripRecord {

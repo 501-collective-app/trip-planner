@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Luggage } from 'lucide-react'
 import { useActiveTrip } from '../store'
 import { BrandMark } from './BrandMark'
 import { TripSwitcherModal } from './TripSwitcherModal'
-import { ClockRow } from './ClockRow'
+import { TripSummaryBar } from './TripSummaryBar'
+import { BudgetPill } from './BudgetPill'
 import type { Tab } from './Sidebar'
 
 export function TopBar({ onHome }: { onHome: (t: Tab) => void }) {
@@ -12,11 +13,11 @@ export function TopBar({ onHome }: { onHome: (t: Tab) => void }) {
 
   return (
     <header
-      className="border-b border-stone-200 bg-white px-4 py-3 md:px-6 md:py-4"
+      className="border-b border-stone-200 bg-white pb-3 md:pb-[34px]"
       style={{ paddingTop: 'calc(0.75rem + var(--safe-top))' }}
     >
-      <div className="flex items-center justify-between gap-3">
-        <button onClick={() => onHome('overview')} className="flex items-center gap-3 md:hidden">
+      <div className="flex items-center justify-between gap-3 px-4 md:hidden">
+        <button onClick={() => onHome('overview')} className="flex items-center gap-3">
           <div className="scale-75 origin-left">
             <BrandMark size="sm" on="light" />
           </div>
@@ -24,14 +25,18 @@ export function TopBar({ onHome }: { onHome: (t: Tab) => void }) {
 
         <button
           onClick={() => setSwitching(true)}
-          className="ml-auto flex min-w-0 items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+          className="ml-auto flex min-w-0 items-center gap-2 rounded-full bg-brand-dark px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:brightness-110"
         >
-          <span className="max-w-[46vw] truncate md:max-w-xs">{trip.trip.name}</span>
-          <ChevronDown size={14} className="shrink-0 text-stone-400" />
+          <Luggage size={15} className="shrink-0 text-brand-mint" />
+          <span className="max-w-[46vw] truncate">{trip.trip.name}</span>
+          <ChevronDown size={14} className="shrink-0 text-white/50" />
         </button>
       </div>
-      <div className="mt-2">
-        <ClockRow />
+      {/* Same max-w-5xl + px-3/md:px-6 as the Overview/Budget page containers,
+          so the header lines up edge-to-edge with the cards below it. */}
+      <div className="mx-auto mt-4 flex max-w-5xl flex-col items-stretch gap-5 px-3 md:mt-[50px] md:gap-[35px] md:px-6">
+        <TripSummaryBar />
+        <BudgetPill />
       </div>
 
       {switching && <TripSwitcherModal onClose={() => setSwitching(false)} />}

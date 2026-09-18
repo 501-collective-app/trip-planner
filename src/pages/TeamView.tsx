@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Plus, Trash2, Mail, Camera, ShieldCheck, Users as UsersIcon, Plane } from 'lucide-react'
+import { Plus, Trash2, Mail, Camera, ShieldCheck, Users as UsersIcon, Plane, FileText, X, ZoomIn } from 'lucide-react'
 import { useStore, useActiveTrip } from '../store'
 import { Modal } from '../components/Modal'
+import { formatShortDate, isExpiringSoon } from '../lib/date'
 import type { MemberType, TeamMember } from '../types'
 
 const PALETTE = ['#81e0ae', '#ffc800', '#2563eb', '#ea580c', '#dc2626', '#0891b2', '#7c3aed', '#c026d3']
@@ -22,14 +23,13 @@ export function TeamView() {
 
   return (
     <div className="mx-auto max-w-3xl px-3 py-4 md:px-6 md:py-6">
-      <div className="mb-6 flex items-center justify-between">
-        <p className="text-sm text-stone-500">Everyone with access to this trip's calendar and budget.</p>
+      <div className="mb-6 flex items-center justify-end">
         <button
           onClick={() => setInviting(true)}
           className="flex items-center gap-1 rounded-lg bg-brand-mint-dark px-3 py-1.5 text-xs font-medium text-white hover:brightness-95"
         >
           <Plus size={14} />
-          Invite teammate
+          Add teammate
         </button>
       </div>
 
@@ -73,7 +73,10 @@ function RosterSection({
             const canToggleStatus = isLeader || m.email.toLowerCase() === myEmail
             return (
               <div key={m.id} className="flex items-center gap-4 px-4 py-4 md:px-5">
-                <button onClick={() => onOpen(m.id)} className="flex min-w-0 flex-1 items-center gap-4 text-left">
+                <button
+                  onClick={() => onOpen(m.id)}
+                  className="-mx-2 flex min-w-0 flex-1 items-center gap-4 rounded-lg px-2 py-1.5 text-left transition-all hover:bg-brand-mint/[0.06] hover:shadow-[0_0_0_1px_rgba(129,224,174,0.5)]"
+                >
                   <div
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-brand-dark"
                     style={{ background: m.color }}
@@ -147,7 +150,7 @@ function InviteForm({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <Modal title="Invite a teammate" onClose={onClose}>
+    <Modal title="Add a teammate" onClose={onClose}>
       <div className="space-y-4">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-stone-500">Name</span>
@@ -225,10 +228,10 @@ function MemberFlightsSection({ memberId }: { memberId: string }) {
             <div key={ev.id} className="flex items-center gap-3">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm text-stone-700">{label}</div>
-                <div className="text-xs text-stone-400">{ev.date}</div>
+                <div className="text-xs text-stone-400">{formatShortDate(ev.date)}</div>
               </div>
               <input
-                className="input w-24 text-center"
+                className="input !w-24 shrink-0 text-center"
                 defaultValue={flight?.seats[memberId] ?? ''}
                 placeholder="Seat"
                 onBlur={(e) => setFlightSeat(ev.id, memberId, e.target.value.toUpperCase())}
@@ -253,8 +256,13 @@ function MemberDetailModal({ memberId, isLeader, onClose }: { memberId: string; 
   const [role, setRole] = useState(member?.role ?? '')
   const [legalName, setLegalName] = useState(sensitive?.legalName ?? '')
   const [emergencyContact, setEmergencyContact] = useState(sensitive?.emergencyContact ?? '')
+  const [passportNumber, setPassportNumber] = useState(sensitive?.passportNumber ?? '')
+  const [passportExpiry, setPassportExpiry] = useState(sensitive?.passportExpiry ?? '')
+  const [visaStatus, setVisaStatus] = useState(sensitive?.visaStatus ?? '')
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const [photoExpanded, setPhotoExpanded] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -272,11 +280,27 @@ function MemberDetailModal({ memberId, isLeader, onClose }: { memberId: string; 
   function saveEmergencyContact() {
     if (emergencyContact !== (sensitive?.emergencyContact ?? '')) updateMemberSensitive(memberId, { emergencyContact })
   }
+  function savePassportNumber() {
+    if (passportNumber !== (sensitive?.passportNumber ?? '')) updateMemberSensitive(memberId, { passportNumber })
+  }
+  function savePassportExpiry() {
+    if (passportExpiry !== (sensitive?.passportExpiry ?? '')) updateMemberSensitive(memberId, { passportExpiry })
+  }
+  function saveVisaStatus() {
+    if (visaStatus !== (sensitive?.visaStatus ?? '')) updateMemberSensitive(memberId, { visaStatus })
+  }
 
   async function handlePhoto(file: File) {
     setUploading(true)
-    await uploadPassportPhoto(memberId, file)
+    setPhotoError(null)
+    const { error } = await uploadPassportPhoto(memberId, file)
     setUploading(false)
+    if (error) {
+      setPhotoError(error)
+      return
+    }
+    const path = `${useStore.getState().activeTripId}/${memberId}.${file.type.includes('png') ? 'png' : 'jpg'}`
+    getPassportPhotoUrl(path).then(setPhotoUrl)
   }
 
   return (
@@ -308,8 +332,20 @@ function MemberDetailModal({ memberId, isLeader, onClose }: { memberId: string; 
 
               <div className="mb-3">
                 {photoUrl ? (
-                  <div className="relative">
-                    <img src={photoUrl} alt="Passport" className="h-40 w-full rounded-lg object-cover" />
+                  <div className="group relative">
+                    <button
+                      onClick={() => setPhotoExpanded(true)}
+                      className="block w-full cursor-zoom-in"
+                      title="Click to expand"
+                    >
+                      <img src={photoUrl} alt="Passport" className="aspect-[125/88] w-full rounded-lg bg-stone-100 object-contain" />
+                      <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 opacity-0 transition-all group-hover:bg-black/20 group-hover:opacity-100">
+                        <span className="flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white">
+                          <ZoomIn size={13} />
+                          Expand
+                        </span>
+                      </span>
+                    </button>
                     <button
                       onClick={() => fileRef.current?.click()}
                       className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"
@@ -327,6 +363,7 @@ function MemberDetailModal({ memberId, isLeader, onClose }: { memberId: string; 
                     {uploading ? 'Uploading…' : 'Add passport photo'}
                   </button>
                 )}
+                {photoError && <p className="mt-1.5 text-xs text-red-600">Upload failed: {photoError}</p>}
                 <input
                   ref={fileRef}
                   type="file"
@@ -345,7 +382,7 @@ function MemberDetailModal({ memberId, isLeader, onClose }: { memberId: string; 
                 <span className="mb-1 block text-xs font-medium text-stone-500">Full legal name</span>
                 <input className="input" value={legalName} onChange={(e) => setLegalName(e.target.value)} onBlur={saveLegalName} />
               </label>
-              <label className="block">
+              <label className="mb-3 block">
                 <span className="mb-1 block text-xs font-medium text-stone-500">Emergency contact</span>
                 <input
                   className="input"
@@ -355,9 +392,45 @@ function MemberDetailModal({ memberId, isLeader, onClose }: { memberId: string; 
                   placeholder="Name + phone number"
                 />
               </label>
+
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-stone-400">
+                <FileText size={13} />
+                Travel documents
+              </div>
+              <div className="mb-3 grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-stone-500">Passport number</span>
+                  <input className="input" value={passportNumber} onChange={(e) => setPassportNumber(e.target.value)} onBlur={savePassportNumber} />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-stone-500">Passport expiry</span>
+                  <input
+                    className="input"
+                    type="date"
+                    value={passportExpiry}
+                    onChange={(e) => setPassportExpiry(e.target.value)}
+                    onBlur={savePassportExpiry}
+                  />
+                </label>
+              </div>
+              {passportExpiry && isExpiringSoon(passportExpiry, active.trip.endDate) && (
+                <p className="mb-3 text-xs font-medium text-red-600">
+                  Expires within 6 months of the trip end date — many countries require 6 months' validity to enter.
+                </p>
+              )}
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-stone-500">Visa status</span>
+                <input
+                  className="input"
+                  value={visaStatus}
+                  onChange={(e) => setVisaStatus(e.target.value)}
+                  onBlur={saveVisaStatus}
+                  placeholder="e.g. Not required, e-Visa approved, Pending"
+                />
+              </label>
             </>
           ) : (
-            <p className="text-xs text-stone-400">Passport photo and emergency contact are only visible to trip leaders.</p>
+            <p className="text-xs text-stone-400">Passport photo, documents, and emergency contact are only visible to trip leaders.</p>
           )}
         </div>
 
@@ -367,6 +440,23 @@ function MemberDetailModal({ memberId, isLeader, onClose }: { memberId: string; 
           </button>
         </div>
       </div>
+
+      {photoExpanded && photoUrl && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
+          style={{ paddingTop: 'calc(1rem + var(--safe-top))', paddingBottom: 'calc(1rem + var(--safe-bottom))' }}
+          onClick={() => setPhotoExpanded(false)}
+        >
+          <img src={photoUrl} alt="Passport (expanded)" className="max-h-full max-w-full rounded-lg object-contain" onClick={(e) => e.stopPropagation()} />
+          <button
+            onClick={() => setPhotoExpanded(false)}
+            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            style={{ top: 'calc(1rem + var(--safe-top))' }}
+          >
+            <X size={22} />
+          </button>
+        </div>
+      )}
     </Modal>
   )
 }
